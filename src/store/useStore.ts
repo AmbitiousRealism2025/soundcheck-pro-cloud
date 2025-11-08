@@ -6,6 +6,8 @@ type State = {
   rehearsals: Rehearsal[]
   gigs: Gig[]
   loaded: boolean
+  // UI state
+  sidebarOpen: boolean
 }
 
 type Actions = {
@@ -14,12 +16,16 @@ type Actions = {
   addGig: (g: Gig) => Promise<void>
   updateRehearsal: (r: Rehearsal) => Promise<void>
   updateGig: (g: Gig) => Promise<void>
+  // UI actions
+  toggleSidebar: () => void
+  setSidebarOpen: (open: boolean) => void
 }
 
 export const useStore = create<State & Actions>((set, get) => ({
   rehearsals: [],
   gigs: [],
   loaded: false,
+  sidebarOpen: true,
   load: async () => {
     const [rehearsals, gigs] = await Promise.all([
       db.rehearsals.toArray(),
@@ -42,5 +48,11 @@ export const useStore = create<State & Actions>((set, get) => ({
   updateGig: async (g) => {
     await db.gigs.put(g)
     set({ gigs: get().gigs.map(x => x.id === g.id ? g : x) })
+  },
+  toggleSidebar: () => {
+    set({ sidebarOpen: !get().sidebarOpen })
+  },
+  setSidebarOpen: (open) => {
+    set({ sidebarOpen: open })
   },
 }))
