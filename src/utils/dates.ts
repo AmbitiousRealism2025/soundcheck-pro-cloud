@@ -1,8 +1,8 @@
 import { format, parseISO } from 'date-fns'
 
-export function fmtDate(iso: string) {
+export function fmtDate(iso: string, fmt: string = 'MMM d, yyyy h:mma') {
   try {
-    return format(parseISO(iso), 'MMM d, yyyy h:mma')
+    return format(parseISO(iso), fmt)
   } catch {
     return iso
   }
