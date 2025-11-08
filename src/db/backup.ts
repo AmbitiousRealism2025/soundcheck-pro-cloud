@@ -91,11 +91,16 @@ export const createBackup = async (): Promise<string> => {
 }
 
 /**
- * Restore from a backup in localStorage
+ * Restore from the latest backup in localStorage
  */
-export const restoreBackup = async (backupKey: string): Promise<void> => {
+export const restoreBackup = async (): Promise<void> => {
   try {
-    const backupData = localStorage.getItem(backupKey)
+    const latestBackupKey = localStorage.getItem('soundcheck-latest-backup')
+    if (!latestBackupKey) {
+      throw new Error('No backup found')
+    }
+
+    const backupData = localStorage.getItem(latestBackupKey)
     if (!backupData) {
       throw new Error('Backup not found')
     }
@@ -105,6 +110,29 @@ export const restoreBackup = async (backupKey: string): Promise<void> => {
   } catch (error) {
     console.error('Error restoring backup:', error)
     throw error
+  }
+}
+
+/**
+ * Get the timestamp of the latest backup
+ */
+export const getBackupTimestamp = (): number | null => {
+  try {
+    const latestBackupKey = localStorage.getItem('soundcheck-latest-backup')
+    if (!latestBackupKey) {
+      return null
+    }
+
+    const backupData = localStorage.getItem(latestBackupKey)
+    if (!backupData) {
+      return null
+    }
+
+    const backup: DatabaseBackup = JSON.parse(backupData)
+    return backup.timestamp
+  } catch (error) {
+    console.error('Error getting backup timestamp:', error)
+    return null
   }
 }
 

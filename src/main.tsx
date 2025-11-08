@@ -8,6 +8,8 @@ import { SuspenseFallback } from './components/SuspenseFallback'
 import { OfflineBanner } from './components/OfflineBanner'
 import { UpdateNotification } from './components/UpdateNotification'
 import { ToastProvider } from './components/ui/ToastProvider'
+import { CommandPalette } from './components/CommandPalette'
+import { KeyboardShortcutsProvider } from './components/KeyboardShortcutsProvider'
 import './styles/globals.css'
 import './styles/theme.css'
 
@@ -17,6 +19,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <BrowserRouter>
         <ToastProvider>
           <Suspense fallback={<SuspenseFallback />}>
+            <KeyboardShortcutsProvider />
+            <CommandPalette />
             <OfflineBanner />
             <UpdateNotification />
             <AppRouter />

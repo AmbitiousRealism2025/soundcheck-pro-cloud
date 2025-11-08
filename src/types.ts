@@ -67,6 +67,7 @@ export type GigStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled';
 
 export interface Gig {
   id: ID;
+  eventName?: string;  // Optional event/band name
   date: string;        // ISO8601 (downbeat)
   callTime?: string;   // ISO8601
   venue: Venue;

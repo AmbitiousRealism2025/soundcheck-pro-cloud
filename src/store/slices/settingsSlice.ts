@@ -3,6 +3,8 @@ import type { StateCreator } from 'zustand'
 export type TimeFormat = '12h' | '24h'
 
 export interface Settings {
+  name: string
+  email: string
   homeAddress: string
   preferredTravelMethod: string
   mileageRate: number
@@ -24,8 +26,10 @@ export type SettingsSlice = SettingsState & SettingsActions
 
 // Default settings
 const defaultSettings: Settings = {
+  name: '',
+  email: '',
   homeAddress: '',
-  preferredTravelMethod: 'car',
+  preferredTravelMethod: 'driving',
   mileageRate: 0.67, // 2024 IRS standard mileage rate
   currency: 'USD',
   timeFormat: '12h',

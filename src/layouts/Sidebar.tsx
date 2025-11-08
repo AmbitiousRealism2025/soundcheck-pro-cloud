@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { Home, Music, Calendar, Settings } from 'lucide-react'
+import { Home, Music, Calendar, BarChart3, Settings } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 
 export function Sidebar() {
@@ -9,6 +9,7 @@ export function Sidebar() {
     { to: '/', icon: Home, label: 'Home' },
     { to: '/rehearsals', icon: Music, label: 'Rehearsals' },
     { to: '/gigs', icon: Calendar, label: 'Gigs' },
+    { to: '/analytics', icon: BarChart3, label: 'Analytics' },
     { to: '/settings', icon: Settings, label: 'Settings' },
   ]
 
