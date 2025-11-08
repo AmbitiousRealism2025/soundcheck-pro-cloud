@@ -1,3 +1,5 @@
+@import './tokens.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -6,19 +8,114 @@
   color-scheme: dark;
 }
 
-html, body, #root {
-  height: 100%;
+/* Base styles */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  html, body, #root {
+    height: 100%;
+  }
+
+  body {
+    font-family: var(--font-body);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    font-weight: 600;
+  }
+
+  /* Focus visible styles for accessibility */
+  *:focus-visible {
+    outline: 2px solid hsl(270, 70%, 60%);
+    outline-offset: 2px;
+  }
+
+  /* Screen reader only */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  .sr-only:focus,
+  .sr-only:active {
+    position: static;
+    width: auto;
+    height: auto;
+    padding: inherit;
+    margin: inherit;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+  }
 }
 
-.button {
-  @apply px-4 py-2 rounded-2xl bg-accent text-white shadow-soft hover:opacity-90 transition;
+/* Component utilities */
+@layer components {
+  /* Legacy button class - kept for backwards compatibility */
+  .button {
+    @apply px-4 py-2 rounded-2xl bg-accent text-white shadow-soft hover:opacity-90 transition;
+  }
+
+  /* Card utility */
+  .card {
+    @apply bg-card rounded-2xl p-4 shadow-soft;
+  }
+
+  /* Glassmorphism effect */
+  .glass {
+    backdrop-filter: blur(12px);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  /* Legacy input class */
+  .input {
+    @apply bg-muted text-foreground rounded-xl px-3 py-2 w-full outline-none focus:ring-2 focus:ring-accent;
+  }
+
+  /* Legacy label class */
+  .label {
+    @apply text-sm text-foreground/80 mb-1 block;
+  }
 }
-.card {
-  @apply bg-card rounded-2xl p-4 shadow-soft;
-}
-.input {
-  @apply bg-muted text-foreground rounded-xl px-3 py-2 w-full outline-none focus:ring-2 focus:ring-accent;
-}
-.label {
-  @apply text-sm text-foreground/80 mb-1 block;
+
+/* Utility classes */
+@layer utilities {
+  /* Safe area padding for iOS/Android notches */
+  .safe-area-pb {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .safe-area-pt {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  /* Scrollbar styling */
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
 }
