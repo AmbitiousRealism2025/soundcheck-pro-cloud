@@ -24,7 +24,7 @@ export default function Settings() {
       </div>
       <div className="card">
         <div className="font-medium">Onboarding Tour</div>
-        <div className="text-sm opacity-80 mb-2">Seen: {str(seen).lower()}</div>
+        <div className="text-sm opacity-80 mb-2">Seen: {String(seen).toLowerCase()}</div>
         <button className="button" onClick={resetTour}>Replay Tour</button>
       </div>
     </div>

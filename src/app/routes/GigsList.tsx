@@ -50,7 +50,7 @@ export default function GigsList() {
           <div><label className="label" htmlFor="venueAddress">Venue Address</label><input id="venueAddress" className="input"/></div>
           <div><label className="label" htmlFor="contact">Contact (email/phone)</label><input id="contact" className="input"/></div>
           <div><label className="label" htmlFor="comp">Compensation (number)</label><input id="comp" className="input"/></div>
-          <div><label className="label" htmlFor="notes">Notes</label><textarea id="notes" className="input" rows=3></textarea></div>
+          <div><label className="label" htmlFor="notes">Notes</label><textarea id="notes" className="input" rows={3}></textarea></div>
           <div><button className="button" type="submit">Save</button></div>
         </form>
       )}
@@ -63,7 +63,7 @@ export default function GigsList() {
               <div className="text-sm opacity-80">{fmtDate(g.date)}</div>
             </div>
             {!!g.venue?.address && <div className="text-sm opacity-80 mt-1">{g.venue.address}</div>}
-            {g.compensation !== undefined && <div className="text-xs opacity-60 mt-2">${'{'}g.compensation{'}'}</div>}
+            {g.compensation !== undefined && <div className="text-xs opacity-60 mt-2">${g.compensation}</div>}
           </Link>
         ))}
         {sorted.length === 0 && <div className="opacity-70">No gigs yet.</div>}
