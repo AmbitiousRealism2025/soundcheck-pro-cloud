@@ -1,0 +1,1 @@
+import{o as t,s as e,n as a,e as s}from"./types-pHewKoGw.js";const n=t({title:e().min(1,"Task title is required").max(100,"Task title must be less than 100 characters"),note:e().optional(),status:s(["open","closed"]).default("open"),order:a().int().min(0)}),i=n.partial().extend({id:e()});export{n as t,i as u};
