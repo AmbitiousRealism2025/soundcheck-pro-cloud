@@ -1,16 +1,29 @@
-import React from 'react'
+import React, { Suspense } from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import AppRouter from './AppRouter'
 import { DevTools } from './dev/DevTools'
+import { ErrorBoundary } from './components/ErrorBoundary'
+import { SuspenseFallback } from './components/SuspenseFallback'
+import { OfflineBanner } from './components/OfflineBanner'
+import { UpdateNotification } from './components/UpdateNotification'
+import { ToastProvider } from './components/ui/ToastProvider'
 import './styles/globals.css'
 import './styles/theme.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <AppRouter />
-      <DevTools />
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <ToastProvider>
+          <Suspense fallback={<SuspenseFallback />}>
+            <OfflineBanner />
+            <UpdateNotification />
+            <AppRouter />
+            <DevTools />
+          </Suspense>
+        </ToastProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   </React.StrictMode>
 )

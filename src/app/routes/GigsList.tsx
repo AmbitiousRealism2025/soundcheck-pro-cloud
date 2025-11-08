@@ -24,10 +24,24 @@ export default function GigsList() {
     const venueName = (f.querySelector('#venueName') as HTMLInputElement).value
     const venueAddress = (f.querySelector('#venueAddress') as HTMLInputElement).value
     const contact = (f.querySelector('#contact') as HTMLInputElement).value
-    const compensation = parseFloat((f.querySelector('#comp') as HTMLInputElement).value || '0')
+    const compensationAmount = parseFloat((f.querySelector('#comp') as HTMLInputElement).value || '0')
     const notes = (f.querySelector('#notes') as HTMLTextAreaElement).value
     const now = Date.now()
-    const g: Gig = { id: uid('gig'), date, callTime, venue: { name: venueName, address: venueAddress, contact }, compensation, notes, createdAt: now, updatedAt: now }
+    const g: Gig = {
+      id: uid('gig'),
+      date,
+      callTime,
+      venue: { name: venueName, address: venueAddress, contact },
+      compensation: compensationAmount > 0 ? {
+        amount: compensationAmount,
+        currency: 'USD',
+        status: 'pending'
+      } : undefined,
+      status: 'confirmed',
+      notes,
+      createdAt: now,
+      updatedAt: now
+    }
     await addGig(g)
     setCreating(false)
     params.delete('new'); setParams(params)
@@ -63,7 +77,7 @@ export default function GigsList() {
               <div className="text-sm opacity-80">{fmtDate(g.date)}</div>
             </div>
             {!!g.venue?.address && <div className="text-sm opacity-80 mt-1">{g.venue.address}</div>}
-            {g.compensation !== undefined && <div className="text-xs opacity-60 mt-2">${g.compensation}</div>}
+            {g.compensation && <div className="text-xs opacity-60 mt-2">${g.compensation.amount} {g.compensation.currency}</div>}
           </Link>
         ))}
         {sorted.length === 0 && <div className="opacity-70">No gigs yet.</div>}

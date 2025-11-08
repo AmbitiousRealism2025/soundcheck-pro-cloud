@@ -1,58 +1,42 @@
 import { create } from 'zustand'
-import type { Rehearsal, Gig } from '@/types'
-import { db } from '@/db/db'
+import { devtools } from 'zustand/middleware'
+import { createRehearsalsSlice, type RehearsalsSlice } from './slices/rehearsalsSlice'
+import { createGigsSlice, type GigsSlice } from './slices/gigsSlice'
+import { createUISlice, type UISlice } from './slices/uiSlice'
+import { createSettingsSlice, type SettingsSlice } from './slices/settingsSlice'
 
-type State = {
-  rehearsals: Rehearsal[]
-  gigs: Gig[]
+// Combined store type
+export type StoreState = RehearsalsSlice & GigsSlice & UISlice & SettingsSlice & {
+  // Legacy compatibility - load all data at once
   loaded: boolean
-  // UI state
-  sidebarOpen: boolean
-}
-
-type Actions = {
   load: () => Promise<void>
-  addRehearsal: (r: Rehearsal) => Promise<void>
-  addGig: (g: Gig) => Promise<void>
-  updateRehearsal: (r: Rehearsal) => Promise<void>
-  updateGig: (g: Gig) => Promise<void>
-  // UI actions
-  toggleSidebar: () => void
-  setSidebarOpen: (open: boolean) => void
 }
 
-export const useStore = create<State & Actions>((set, get) => ({
-  rehearsals: [],
-  gigs: [],
-  loaded: false,
-  sidebarOpen: true,
-  load: async () => {
-    const [rehearsals, gigs] = await Promise.all([
-      db.rehearsals.toArray(),
-      db.gigs.toArray()
-    ])
-    set({ rehearsals, gigs, loaded: true })
-  },
-  addRehearsal: async (r) => {
-    await db.rehearsals.put(r)
-    set({ rehearsals: [...get().rehearsals, r] })
-  },
-  addGig: async (g) => {
-    await db.gigs.put(g)
-    set({ gigs: [...get().gigs, g] })
-  },
-  updateRehearsal: async (r) => {
-    await db.rehearsals.put(r)
-    set({ rehearsals: get().rehearsals.map(x => x.id === r.id ? r : x) })
-  },
-  updateGig: async (g) => {
-    await db.gigs.put(g)
-    set({ gigs: get().gigs.map(x => x.id === g.id ? g : x) })
-  },
-  toggleSidebar: () => {
-    set({ sidebarOpen: !get().sidebarOpen })
-  },
-  setSidebarOpen: (open) => {
-    set({ sidebarOpen: open })
-  },
-}))
+export const useStore = create<StoreState>()(
+  devtools(
+    (set, get, api) => ({
+      // Combine all slices
+      ...createRehearsalsSlice(set, get, api),
+      ...createGigsSlice(set, get, api),
+      ...createUISlice(set, get, api),
+      ...createSettingsSlice(set, get, api),
+
+      // Legacy compatibility
+      loaded: false,
+      load: async () => {
+        await Promise.all([
+          get().loadRehearsals(),
+          get().loadGigs(),
+        ])
+        set({ loaded: true })
+      },
+    }),
+    {
+      name: 'soundcheck-store',
+      enabled: import.meta.env.DEV,
+    }
+  )
+)
+
+// Export types for convenience
+export type { RehearsalsSlice, GigsSlice, UISlice, SettingsSlice }
