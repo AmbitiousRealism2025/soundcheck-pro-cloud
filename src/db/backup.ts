@@ -182,3 +182,11 @@ export const uploadDatabase = (file: File): Promise<void> => {
     reader.readAsText(file)
   })
 }
+
+/**
+ * Export all data (convenience wrapper for downloadDatabase)
+ */
+export const exportAllData = async (): Promise<void> => {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
+  await downloadDatabase(`soundcheck-backup-${timestamp}.json`)
+}

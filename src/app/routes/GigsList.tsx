@@ -1,87 +1,192 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useStore } from '@/store/useStore'
+import { useGigs, useUI } from '@/store/hooks'
+import { GigCard } from '@/components/gigs/GigCard'
+import { GigFilters, type GigFilterStatus } from '@/components/gigs/GigFilters'
+import { Button } from '@/components/ui/Button'
+import { Modal } from '@/components/ui/Modal'
+import { Input } from '@/components/ui/Input'
+import { Textarea } from '@/components/ui/Textarea'
+import { useFormValidation } from '@/hooks/useFormValidation'
+import { createGigSchema } from '@/schemas/gigSchema'
 import { uid } from '@/utils/id'
 import type { Gig } from '@/types'
-import { Link, useSearchParams } from 'react-router-dom'
-import { fmtDate } from '@/utils/dates'
 
 export default function GigsList() {
-  const { gigs, load, addGig } = useStore()
-  const [params, setParams] = useSearchParams()
-  const [creating, setCreating] = useState(params.get('new') === '1')
-
-  useEffect(() => { load() }, [])
+  const { gigs, loadGigs, addGig } = useGigs()
+  const { activeModal, openModal, closeModal } = useUI()
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<GigFilterStatus>('all')
 
   useEffect(() => {
-    if (params.get('new') === '1') setCreating(true)
-  }, [params])
+    loadGigs()
+  }, [loadGigs])
 
-  const onCreate = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const f = e.target as HTMLFormElement
-    const date = (f.querySelector('#date') as HTMLInputElement).value
-    const callTime = (f.querySelector('#callTime') as HTMLInputElement).value
-    const venueName = (f.querySelector('#venueName') as HTMLInputElement).value
-    const venueAddress = (f.querySelector('#venueAddress') as HTMLInputElement).value
-    const contact = (f.querySelector('#contact') as HTMLInputElement).value
-    const compensationAmount = parseFloat((f.querySelector('#comp') as HTMLInputElement).value || '0')
-    const notes = (f.querySelector('#notes') as HTMLTextAreaElement).value
-    const now = Date.now()
-    const g: Gig = {
-      id: uid('gig'),
-      date,
-      callTime,
-      venue: { name: venueName, address: venueAddress, contact },
-      compensation: compensationAmount > 0 ? {
-        amount: compensationAmount,
+  // Form for creating new gig
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+  } = useFormValidation(createGigSchema, {
+    defaultValues: {
+      date: '',
+      callTime: '',
+      venue: {
+        name: '',
+        address: '',
+        contact: '',
+      },
+      compensation: {
+        amount: 0,
         currency: 'USD',
-        status: 'pending'
-      } : undefined,
-      status: 'confirmed',
-      notes,
+        status: 'pending',
+      },
+      status: 'pending',
+      notes: '',
+    },
+  })
+
+  const onSubmit = async (data: any) => {
+    const now = Date.now()
+    const newGig: Gig = {
+      id: uid('gig'),
+      date: data.date,
+      callTime: data.callTime,
+      venue: data.venue,
+      compensation: data.compensation.amount > 0 ? data.compensation : undefined,
+      status: data.status || 'pending',
+      notes: data.notes,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     }
-    await addGig(g)
-    setCreating(false)
-    params.delete('new'); setParams(params)
+
+    await addGig(newGig)
+    reset()
+    closeModal()
   }
 
-  const sorted = useMemo(() => [...gigs].sort((a,b) => a.date.localeCompare(b.date)), [gigs])
+  // Filter and sort gigs
+  const filteredGigs = useMemo(() => {
+    return gigs
+      .filter((g) => {
+        // Search filter
+        const matchesSearch = g.venue.name
+          .toLowerCase()
+          .includes(search.toLowerCase())
+
+        // Status filter
+        const matchesStatus =
+          statusFilter === 'all' || g.status === statusFilter
+
+        return matchesSearch && matchesStatus
+      })
+      .sort((a, b) => a.date.localeCompare(b.date))
+  }, [gigs, search, statusFilter])
 
   return (
-    <div className="grid gap-6">
+    <div className="space-y-6">
       <header className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Gigs</h1>
-        <button className="button" onClick={() => setCreating(v => !v)}>New Gig</button>
+        <h1 className="text-2xl font-bold">Gigs</h1>
+        <Button variant="primary" onClick={() => openModal('create-gig')}>
+          New Gig
+        </Button>
       </header>
 
-      {creating && (
-        <form onSubmit={onCreate} className="card grid gap-3 max-w-xl">
-          <div><label className="label" htmlFor="date">Date/Time (ISO)</label><input id="date" className="input" placeholder="2025-06-21T21:00:00.000Z" required/></div>
-          <div><label className="label" htmlFor="callTime">Call Time (ISO)</label><input id="callTime" className="input" placeholder="2025-06-21T19:30:00.000Z"/></div>
-          <div><label className="label" htmlFor="venueName">Venue Name</label><input id="venueName" className="input" required/></div>
-          <div><label className="label" htmlFor="venueAddress">Venue Address</label><input id="venueAddress" className="input"/></div>
-          <div><label className="label" htmlFor="contact">Contact (email/phone)</label><input id="contact" className="input"/></div>
-          <div><label className="label" htmlFor="comp">Compensation (number)</label><input id="comp" className="input"/></div>
-          <div><label className="label" htmlFor="notes">Notes</label><textarea id="notes" className="input" rows={3}></textarea></div>
-          <div><button className="button" type="submit">Save</button></div>
-        </form>
+      <GigFilters
+        search={search}
+        onSearchChange={setSearch}
+        statusFilter={statusFilter}
+        onStatusFilterChange={setStatusFilter}
+      />
+
+      {filteredGigs.length === 0 ? (
+        <div className="py-12 text-center">
+          <p className="text-lg opacity-60 mb-4">
+            {search || statusFilter !== 'all'
+              ? 'No gigs match your filters'
+              : 'No gigs yet. Create your first one!'}
+          </p>
+          <Button variant="primary" onClick={() => openModal('create-gig')}>
+            New Gig
+          </Button>
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {filteredGigs.map((gig) => (
+            <GigCard key={gig.id} gig={gig} />
+          ))}
+        </div>
       )}
 
-      <div className="grid gap-3">
-        {sorted.map(g => (
-          <Link key={g.id} to={`/gigs/${g.id}`} className="card block">
-            <div className="flex items-center justify-between">
-              <div className="font-medium">{g.venue?.name ?? 'Untitled Venue'}</div>
-              <div className="text-sm opacity-80">{fmtDate(g.date)}</div>
-            </div>
-            {!!g.venue?.address && <div className="text-sm opacity-80 mt-1">{g.venue.address}</div>}
-            {g.compensation && <div className="text-xs opacity-60 mt-2">${g.compensation.amount} {g.compensation.currency}</div>}
-          </Link>
-        ))}
-        {sorted.length === 0 && <div className="opacity-70">No gigs yet.</div>}
-      </div>
+      {/* Create Gig Modal */}
+      <Modal
+        open={activeModal === 'create-gig'}
+        onClose={closeModal}
+        title="Create New Gig"
+      >
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <Input
+            label="Venue Name"
+            {...register('venue.name')}
+            error={errors.venue?.name?.message}
+            placeholder="Blue Note Jazz Club"
+          />
+
+          <Input
+            label="Venue Address (optional)"
+            {...register('venue.address')}
+            error={errors.venue?.address?.message}
+            placeholder="123 Main St, New York, NY"
+          />
+
+          <Input
+            label="Venue Contact (optional)"
+            {...register('venue.contact')}
+            error={errors.venue?.contact?.message}
+            placeholder="Email or phone"
+          />
+
+          <Input
+            label="Performance Date & Time"
+            type="datetime-local"
+            {...register('date')}
+            error={errors.date?.message}
+          />
+
+          <Input
+            label="Call Time (optional)"
+            type="datetime-local"
+            {...register('callTime')}
+            error={errors.callTime?.message}
+          />
+
+          <Input
+            label="Compensation Amount (optional)"
+            type="number"
+            step="0.01"
+            {...register('compensation.amount', { valueAsNumber: true })}
+            error={errors.compensation?.amount?.message}
+            placeholder="0.00"
+          />
+
+          <Textarea
+            label="Notes (optional)"
+            {...register('notes')}
+            error={errors.notes?.message}
+            placeholder="Any additional details..."
+            rows={3}
+          />
+
+          <div className="flex gap-3 pt-4">
+            <Button type="button" variant="ghost" onClick={closeModal} className="flex-1">
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" className="flex-1">
+              Create
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   )
 }
