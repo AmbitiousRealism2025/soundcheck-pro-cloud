@@ -3,7 +3,7 @@ import { useStore } from '@/store/useStore'
 import { useMemo, useState } from 'react'
 import { fmtDate } from '@/utils/dates'
 import { uid } from '@/utils/id'
-import type { Task } from '@/types'
+import type { Task, TaskStatus } from '@/types'
 
 export default function RehearsalDetail() {
   const { id } = useParams()
@@ -25,7 +25,7 @@ export default function RehearsalDetail() {
   }
 
   const toggle = async (tid: string) => {
-    const updated = { ...rehearsal, tasks: rehearsal.tasks.map(t => t.id===tid ? { ...t, status: t.status==='open' ? 'closed' : 'open' } : t) , updatedAt: Date.now() }
+    const updated = { ...rehearsal, tasks: rehearsal.tasks.map(t => t.id===tid ? { ...t, status: (t.status==='open' ? 'closed' : 'open') as TaskStatus } : t) , updatedAt: Date.now() }
     await updateRehearsal(updated)
   }
 
