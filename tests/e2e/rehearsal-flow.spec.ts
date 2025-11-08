@@ -20,22 +20,20 @@ test.describe('Rehearsal Flow', () => {
     // Navigate to rehearsals page
     await page.goto('/rehearsals')
 
-    // Click the "New Rehearsal" button (FAB or header button)
-    const newRehearsalButton = page.locator('button:has-text("New Rehearsal"), button[aria-label*="rehearsal" i]').first()
-    await newRehearsalButton.click()
+    // Click the "New Rehearsal" button
+    await page.getByTestId('new-rehearsal-button').click()
 
     // Wait for modal to appear
     await page.waitForSelector('[role="dialog"]', { timeout: 3000 })
 
     // Fill in rehearsal details
-    await page.fill('input[name="eventName"], input[placeholder*="name" i]', 'Test Rehearsal')
+    await page.fill('input[name="eventName"]', 'Test Rehearsal')
 
     // Fill in date (ISO format)
-    const dateInput = page.locator('input[type="datetime-local"], input[type="date"]').first()
-    await dateInput.fill('2025-12-25T14:00')
+    await page.locator('input[type="datetime-local"]').first().fill('2025-12-25T14:00')
 
     // Submit the form
-    await page.click('button[type="submit"]:has-text("Create"), button:has-text("Save")')
+    await page.getByTestId('submit-create-rehearsal').click()
 
     // Wait for modal to close and verify creation
     await page.waitForSelector('[role="dialog"]', { state: 'hidden', timeout: 3000 })
@@ -49,7 +47,7 @@ test.describe('Rehearsal Flow', () => {
     await page.goto('/rehearsals')
 
     // If there are rehearsals, click on the first one
-    const firstRehearsal = page.locator('[data-testid="rehearsal-card"], article, .rehearsal-card').first()
+    const firstRehearsal = page.getByTestId('rehearsal-card').first()
 
     if (await firstRehearsal.count() > 0) {
       await firstRehearsal.click()
@@ -67,7 +65,7 @@ test.describe('Rehearsal Flow', () => {
     await page.goto('/rehearsals')
 
     // Click first rehearsal if available
-    const firstRehearsal = page.locator('[data-testid="rehearsal-card"], article').first()
+    const firstRehearsal = page.getByTestId('rehearsal-card').first()
 
     if (await firstRehearsal.count() > 0) {
       await firstRehearsal.click()
@@ -80,10 +78,10 @@ test.describe('Rehearsal Flow', () => {
         await addTaskButton.click()
 
         // Fill in task details
-        await page.fill('input[placeholder*="task" i], input[name="title"]', 'New Test Task')
+        await page.fill('input[name="title"]', 'New Test Task')
 
         // Save the task
-        await page.click('button[type="submit"], button:has-text("Add"), button:has-text("Save")')
+        await page.click('button[type="submit"]')
 
         // Verify task appears
         await expect(page.locator('text=New Test Task')).toBeVisible({ timeout: 3000 })
@@ -94,26 +92,27 @@ test.describe('Rehearsal Flow', () => {
   test('should delete a rehearsal', async ({ page }) => {
     await page.goto('/rehearsals')
 
-    // Look for delete button on first rehearsal
-    const deleteButton = page.locator('button[aria-label*="delete" i], button[title*="delete" i]').first()
+    // Get first rehearsal card and hover to reveal delete button
+    const firstCard = page.getByTestId('rehearsal-card').first()
 
-    if (await deleteButton.count() > 0) {
+    if (await firstCard.count() > 0) {
       // Count rehearsals before deletion
-      const rehearsalsBefore = await page.locator('[data-testid="rehearsal-card"], article').count()
+      const rehearsalsBefore = await page.getByTestId('rehearsal-card').count()
 
-      await deleteButton.click()
+      // Hover over card to reveal delete button
+      await firstCard.hover()
 
-      // Confirm deletion if there's a confirmation dialog
-      const confirmButton = page.locator('button:has-text("Delete"), button:has-text("Confirm")').first()
-      if (await confirmButton.isVisible({ timeout: 1000 })) {
-        await confirmButton.click()
-      }
+      // Click delete button within the card
+      await page.getByTestId('delete-rehearsal-button').first().click()
 
-      // Wait a bit for deletion to complete
+      // Confirm deletion in dialog
+      await page.getByTestId('confirm-dialog-confirm').click()
+
+      // Wait for deletion to complete
       await page.waitForTimeout(500)
 
       // Verify count decreased (or show empty state)
-      const rehearsalsAfter = await page.locator('[data-testid="rehearsal-card"], article').count()
+      const rehearsalsAfter = await page.getByTestId('rehearsal-card').count()
       expect(rehearsalsAfter).toBeLessThanOrEqual(rehearsalsBefore)
     }
   })

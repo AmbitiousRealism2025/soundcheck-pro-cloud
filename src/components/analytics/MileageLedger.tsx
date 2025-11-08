@@ -3,6 +3,7 @@ import { calculateTotalMileage } from '@/utils/analytics'
 import { format } from 'date-fns'
 import { Car, Download, MapPin } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { toSafeFilename } from '@/utils/sanitize'
 
 /**
  * Mileage ledger table
@@ -35,7 +36,10 @@ export function MileageLedger() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `mileage-log-${format(new Date(), 'yyyy-MM-dd')}.csv`
+    a.download = toSafeFilename(
+      `mileage-log-${format(new Date(), 'yyyy-MM-dd')}`,
+      '.csv'
+    )
     a.click()
     URL.revokeObjectURL(url)
   }

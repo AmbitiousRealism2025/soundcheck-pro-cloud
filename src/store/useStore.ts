@@ -12,9 +12,12 @@ export type StoreState = RehearsalsSlice & GigsSlice & UISlice & SettingsSlice &
   // Mileage logs
   mileageLogs: MileageLog[]
   loadMileageLogs: () => Promise<void>
+  resetMileageLogs: () => void
   // Legacy compatibility - load all data at once
   loaded: boolean
   load: () => Promise<void>
+  // Reset all state
+  resetAll: () => void
 }
 
 export const useStore = create<StoreState>()(
@@ -36,6 +39,9 @@ export const useStore = create<StoreState>()(
           console.error('Error loading mileage logs:', error)
         }
       },
+      resetMileageLogs: () => {
+        set({ mileageLogs: [] })
+      },
 
       // Legacy compatibility
       loaded: false,
@@ -46,6 +52,14 @@ export const useStore = create<StoreState>()(
           get().loadMileageLogs(),
         ])
         set({ loaded: true })
+      },
+
+      // Reset all state to initial values
+      resetAll: () => {
+        get().resetRehearsals()
+        get().resetGigs()
+        get().resetMileageLogs()
+        set({ loaded: false })
       },
     }),
     {

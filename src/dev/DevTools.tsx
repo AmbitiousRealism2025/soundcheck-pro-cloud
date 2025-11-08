@@ -1,5 +1,26 @@
 import { useState } from 'react'
 import { seedDatabase, clearDatabase, exportDatabase, importDatabase } from '@/db/seed'
+import {
+  DatabaseImportValidationError,
+  formatInvalidRecordSummary,
+} from '@/db/backup'
+import type { DatabaseImportSummary } from '@/db/backup'
+
+const describeImportSummary = (summary: DatabaseImportSummary) => {
+  const formatSegment = (count: number, singular: string, plural: string) =>
+    `${count} ${count === 1 ? singular : plural}`
+
+  const segments = [
+    formatSegment(summary.rehearsals, 'rehearsal', 'rehearsals'),
+    formatSegment(summary.gigs, 'gig', 'gigs'),
+    summary.rehearsalTemplates
+      ? formatSegment(summary.rehearsalTemplates, 'rehearsal template', 'rehearsal templates')
+      : null,
+    summary.mileageLogs ? formatSegment(summary.mileageLogs, 'mileage log', 'mileage logs') : null,
+  ].filter(Boolean)
+
+  return segments.join(', ')
+}
 
 /**
  * Developer Tools Component
@@ -75,12 +96,19 @@ export function DevTools() {
 
       try {
         const text = await file.text()
-        await importDatabase(text)
-        showMessage('✅ Database imported successfully!', 'success')
+        const summary = await importDatabase(text)
+        showMessage(`✅ Imported ${describeImportSummary(summary)}`, 'success')
         // Reload to reflect changes
         setTimeout(() => window.location.reload(), 500)
       } catch (error) {
-        showMessage(`❌ Error importing database: ${error}`, 'error')
+        if (error instanceof DatabaseImportValidationError) {
+          const detail = formatInvalidRecordSummary(error.invalidCounts)
+          const message = detail ?? error.message ?? 'Invalid database export'
+          showMessage(`❌ Import validation failed: ${message}`, 'error')
+        } else {
+          const fallback = error instanceof Error ? error.message : String(error)
+          showMessage(`❌ Error importing database: ${fallback}`, 'error')
+        }
       }
     }
     input.click()

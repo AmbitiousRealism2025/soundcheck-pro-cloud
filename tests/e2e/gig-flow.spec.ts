@@ -21,36 +21,28 @@ test.describe('Gig Flow', () => {
     await page.goto('/gigs')
 
     // Click the "New Gig" button
-    const newGigButton = page.locator('button:has-text("New Gig"), button[aria-label*="gig" i]').first()
-    await newGigButton.click()
+    await page.getByTestId('new-gig-button').click()
 
     // Wait for modal to appear
     await page.waitForSelector('[role="dialog"]', { timeout: 3000 })
 
-    // Fill in gig details
-    await page.fill('input[name="eventName"], input[placeholder*="name" i], input[placeholder*="event" i]', 'Test Gig')
+    // Fill in venue name
+    await page.fill('input[name="venue.name"]', 'The Blue Note')
 
     // Fill in date
-    const dateInput = page.locator('input[type="datetime-local"], input[type="date"]').first()
-    await dateInput.fill('2025-12-31T20:00')
+    await page.locator('input[type="datetime-local"]').first().fill('2025-12-31T20:00')
 
-    // Fill in venue name
-    await page.fill('input[name="venue.name"], input[placeholder*="venue" i]', 'The Blue Note')
-
-    // Fill in compensation (if visible)
-    const compensationInput = page.locator('input[name="compensation.amount"], input[placeholder*="amount" i], input[type="number"]').first()
-    if (await compensationInput.count() > 0) {
-      await compensationInput.fill('500')
-    }
+    // Fill in compensation
+    await page.fill('input[name="compensation.amount"]', '500')
 
     // Submit the form
-    await page.click('button[type="submit"]:has-text("Create"), button:has-text("Save")')
+    await page.getByTestId('submit-create-gig').click()
 
     // Wait for modal to close
     await page.waitForSelector('[role="dialog"]', { state: 'hidden', timeout: 3000 })
 
     // Verify the gig appears in the list
-    await expect(page.locator('text=Test Gig')).toBeVisible()
+    await expect(page.locator('text=The Blue Note')).toBeVisible()
   })
 
   test('should view gig details', async ({ page }) => {
@@ -58,7 +50,7 @@ test.describe('Gig Flow', () => {
     await page.goto('/gigs')
 
     // If there are gigs, click on the first one
-    const firstGig = page.locator('[data-testid="gig-card"], article, .gig-card').first()
+    const firstGig = page.getByTestId('gig-card').first()
 
     if (await firstGig.count() > 0) {
       await firstGig.click()
@@ -100,7 +92,7 @@ test.describe('Gig Flow', () => {
     await page.goto('/gigs')
 
     // Click first gig
-    const firstGig = page.locator('[data-testid="gig-card"], article').first()
+    const firstGig = page.getByTestId('gig-card').first()
 
     if (await firstGig.count() > 0) {
       await firstGig.click()
@@ -122,7 +114,7 @@ test.describe('Gig Flow', () => {
     await page.goto('/gigs')
 
     // Click first gig
-    const firstGig = page.locator('[data-testid="gig-card"], article').first()
+    const firstGig = page.getByTestId('gig-card').first()
 
     if (await firstGig.count() > 0) {
       await firstGig.click()

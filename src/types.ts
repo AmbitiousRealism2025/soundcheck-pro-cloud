@@ -91,3 +91,17 @@ export interface MileageLog {
   amount: number; // total reimbursement
   createdAt: number;
 }
+
+export type SyncOperationStatus = 'pending' | 'processing' | 'failed' | 'completed';
+
+export interface SyncOperation {
+  id: ID;
+  type: 'create' | 'update' | 'delete';
+  entity: 'rehearsal' | 'gig' | 'template' | 'mileage';
+  data: unknown;
+  timestamp: number;
+  status: SyncOperationStatus;
+  retryCount: number;
+  nextAttemptAt: number;
+  lastError?: string;
+}

@@ -121,6 +121,7 @@ export function Modal({
                 onClick={onClose}
                 className="p-1 hover:bg-white/5 rounded-lg transition-colors"
                 aria-label="Close modal"
+                data-testid="modal-close-button"
               >
                 <X size={20} />
               </button>

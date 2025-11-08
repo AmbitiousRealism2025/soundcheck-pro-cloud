@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useRehearsalById } from '@/store/hooks'
 import { useRehearsals } from '@/store/hooks'
@@ -7,12 +8,14 @@ import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { fmtDate } from '@/utils/dates'
 import type { Task, Note } from '@/types'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 
 export default function RehearsalDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const rehearsal = useRehearsalById(id!)
   const { updateRehearsal, deleteRehearsal, duplicateRehearsal } = useRehearsals()
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
   if (!rehearsal) {
     return (
@@ -44,11 +47,10 @@ export default function RehearsalDetail() {
     })
   }
 
-  const handleDelete = async () => {
-    if (window.confirm(`Delete "${rehearsal.eventName}"? This cannot be undone.`)) {
-      await deleteRehearsal(rehearsal.id)
-      navigate('/rehearsals')
-    }
+  const handleDeleteConfirmed = async () => {
+    await deleteRehearsal(rehearsal.id)
+    setDeleteDialogOpen(false)
+    navigate('/rehearsals')
   }
 
   const handleDuplicate = async () => {
@@ -97,7 +99,7 @@ export default function RehearsalDetail() {
             <Button
               size="sm"
               variant="danger"
-              onClick={handleDelete}
+              onClick={() => setDeleteDialogOpen(true)}
             >
               Delete
             </Button>
@@ -163,6 +165,28 @@ export default function RehearsalDetail() {
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title="Delete rehearsal?"
+        description={
+          <>
+            <p>
+              This will permanently delete
+              {' '}
+              <strong>{rehearsal.eventName}</strong>
+              {' '}and all associated tasks and notes.
+            </p>
+            <p className="mt-1 text-warning">
+              This action cannot be undone.
+            </p>
+          </>
+        }
+        confirmLabel="Delete rehearsal"
+        confirmVariant="danger"
+        onConfirm={handleDeleteConfirmed}
+        onCancel={() => setDeleteDialogOpen(false)}
+      />
     </div>
   )
 }

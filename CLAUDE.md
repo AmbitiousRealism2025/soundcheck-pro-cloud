@@ -58,20 +58,25 @@ When adding state logic, prepare for this migration by keeping domain concerns s
 
 ### Database Schema
 
-**Current Dexie v1 schema** (`src/db/db.ts`):
+**Current Dexie v3 schema** (`src/db/db.ts`):
 ```typescript
-rehearsals: 'id, date, eventName, updatedAt'
-gigs: 'id, date, venue.name, updatedAt'
+rehearsals: 'id, date, eventName, updatedAt, templateId'
+gigs: 'id, date, status, updatedAt'
+rehearsalTemplates: 'id, name'
+mileageLogs: 'id, gigId, date'
+syncQueue: 'id, status, nextAttemptAt, timestamp'
 ```
 
-**Planned v2 migration** adds:
-- `rehearsalTemplates` table
-- `attachments` table
-- `mileageLogs` table
-- Enhanced Rehearsal type with embedded tasks array, notes, attachments
-- Enhanced Gig type with compensation tracking, status field
+**Schema Evolution:**
+- **v1**: Basic rehearsals and gigs tables
+- **v2**: Added templates, mileage logs, enhanced types with attachments/notes
+- **v3**: Added syncQueue table for offline sync coordination
 
-When modifying types, consider migration compatibility.
+**When modifying schema:**
+- Increment version number in `db.ts`
+- Add `.upgrade()` function for data migration
+- Update type definitions in `src/types.ts`
+- Test migration path from previous version
 
 ### File Organization
 
@@ -102,12 +107,20 @@ Always use `@/` imports instead of relative paths.
 
 Core domain types in `src/types.ts`:
 
-- **Rehearsal**: Event with tasks array, date, location
+- **Rehearsal**: Event with tasks array, date, location, optional template reference
 - **Task**: Title, note, status (open/closed), sortable order
-- **Gig**: Performance event with venue, compensation, call time
+- **Gig**: Performance event with venue, compensation, call time, status
 - **Venue**: Name, address, contact
+- **RehearsalTemplate**: Reusable task lists with default tasks
+- **MileageLog**: Travel tracking for gigs with distance and reimbursement
+- **SyncOperation**: Offline mutation queue entry with retry logic
 
 All IDs are string type. Dates are ISO8601 strings. Timestamps (`createdAt`, `updatedAt`) are Unix milliseconds.
+
+**Sync Queue Types:**
+- `SyncOperation`: Tracks mutations for future cloud sync
+- `SyncOperationStatus`: `'pending' | 'processing' | 'failed' | 'completed'`
+- Operations include: type (`create | update | delete`), entity, data, timestamp, retry count
 
 ## Implementation Guidance
 
@@ -144,9 +157,16 @@ All user inputs should be validated before touching the database.
 - **All data persists to IndexedDB immediately** - no backend calls
 - **Service worker caches static assets** - configured in `vite.config.ts`
 - **PWA manifest** defines app metadata for installation
-- Future: sync queue for cloud backup when online
+- **Sync queue** (`src/service-worker/sync-queue.ts`) tracks offline mutations for future cloud sync
 
-When adding features, ensure they work completely offline.
+**Sync Queue Architecture:**
+- Uses Dexie `syncQueue` table for atomic operations
+- `BroadcastChannel` for cross-tab communication
+- `navigator.locks` API ensures only one tab processes queue at a time
+- Exponential backoff retry strategy with `nextAttemptAt` field
+- Reactive updates via `liveQuery()` and cross-tab events
+
+When adding features, ensure they work completely offline. For operations that need cloud sync, add them to the sync queue via `addToSyncQueue()`.
 
 ### Styling Conventions
 
@@ -210,15 +230,27 @@ The `plan-v2-:-coding-plan.md` outlines a 5-phase expansion plan:
 
 When implementing features, check if they're part of the roadmap and follow the planned architecture patterns to avoid rework.
 
-## Testing Strategy (Planned)
+## Testing Strategy
 
-Not yet implemented, but planned stack:
-- **Vitest** for unit/component tests
-- **React Testing Library** for component testing
-- **Playwright** for E2E tests
-- **Storybook** for component documentation
+**Current Stack:**
+- **Playwright** for E2E tests (see `tests/e2e/`)
+- **Vitest** for unit/component tests (planned)
+- **React Testing Library** for component testing (planned)
+- **Storybook** for component documentation (planned)
 
-When adding components, structure them for testability (pure functions, dependency injection for Dexie/Zustand).
+**E2E Testing Best Practices:**
+- Always use `data-testid` attributes for stable selectors
+- Use `page.getByTestId('element-name')` over text-based or class selectors
+- Add test IDs to critical UI elements: cards, buttons, form controls, dialogs
+- Convention: Use kebab-case for test IDs (e.g., `rehearsal-card`, `new-gig-button`)
+
+**Test ID Naming Conventions:**
+- Cards: `{entity}-card` (e.g., `rehearsal-card`, `gig-card`)
+- Action buttons: `{action}-{entity}-button` (e.g., `new-rehearsal-button`, `delete-gig-button`)
+- Form buttons: `{action}-{form-name}` (e.g., `submit-create-rehearsal`, `cancel-create-gig`)
+- Dialog buttons: `confirm-dialog-{action}` (e.g., `confirm-dialog-confirm`, `confirm-dialog-cancel`)
+
+When adding components, structure them for testability (pure functions, dependency injection for Dexie/Zustand). Always add `data-testid` attributes to interactive elements.
 
 ## PWA Considerations
 
@@ -321,6 +353,8 @@ See `PROGRESS.md` for the exact format and examples.
 - ✅ All imports use `@/*` path aliases (not relative paths)
 - ✅ All async operations have try-catch blocks with error handling
 - ✅ All user-facing strings are meaningful (prepare for future i18n)
+- ✅ All interactive elements have `data-testid` attributes for E2E testing
+- ✅ All database operations use Dexie transactions for atomicity
 
 ### Communication Guidelines
 

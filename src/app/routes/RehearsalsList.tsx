@@ -9,6 +9,7 @@ import { useFormValidation } from '@/hooks/useFormValidation'
 import { createRehearsalSchema } from '@/schemas/rehearsalSchema'
 import { uid } from '@/utils/id'
 import type { Rehearsal } from '@/types'
+import { compareISO, toTimestamp } from '@/utils/dateUtils'
 
 export default function RehearsalsList() {
   const { rehearsals, loadRehearsals, addRehearsal } = useRehearsals()
@@ -61,7 +62,7 @@ export default function RehearsalsList() {
 
   // Group rehearsals
   const groupedRehearsals = useMemo(() => {
-    const sorted = [...filteredRehearsals].sort((a, b) => a.date.localeCompare(b.date))
+    const sorted = [...filteredRehearsals].sort((a, b) => compareISO(a.date, b.date))
 
     if (groupBy === 'none') {
       return { All: sorted }
@@ -69,10 +70,18 @@ export default function RehearsalsList() {
 
     if (groupBy === 'date') {
       const now = new Date()
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-      const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000)
-      const thisWeekEnd = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
-      const thisMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+      const tomorrow = today + 24 * 60 * 60 * 1000
+      const thisWeekEnd = today + 7 * 24 * 60 * 60 * 1000
+      const thisMonthEnd = new Date(
+        now.getFullYear(),
+        now.getMonth() + 1,
+        0,
+        23,
+        59,
+        59,
+        999
+      ).getTime()
 
       const groups: Record<string, Rehearsal[]> = {
         Today: [],
@@ -84,7 +93,12 @@ export default function RehearsalsList() {
       }
 
       sorted.forEach((r) => {
-        const date = new Date(r.date)
+        const date = toTimestamp(r.date)
+        if (date === null) {
+          groups.Future.push(r)
+          return
+        }
+
         if (date < today) {
           groups.Past.push(r)
         } else if (date >= today && date < tomorrow) {
@@ -108,10 +122,10 @@ export default function RehearsalsList() {
         Past: [],
       }
 
-      const now = new Date()
+      const nowTs = Date.now()
       sorted.forEach((r) => {
-        const date = new Date(r.date)
-        if (date >= now) {
+        const date = toTimestamp(r.date)
+        if (date === null || date >= nowTs) {
           groups.Upcoming.push(r)
         } else {
           groups.Past.push(r)
@@ -128,7 +142,7 @@ export default function RehearsalsList() {
     <div className="space-y-6">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Rehearsals</h1>
-        <Button variant="primary" onClick={() => openModal('create-rehearsal')}>
+        <Button variant="primary" onClick={() => openModal('create-rehearsal')} data-testid="new-rehearsal-button">
           New Rehearsal
         </Button>
       </header>
@@ -191,10 +205,10 @@ export default function RehearsalsList() {
           />
 
           <div className="flex gap-3 pt-4">
-            <Button type="button" variant="ghost" onClick={closeModal} className="flex-1">
+            <Button type="button" variant="ghost" onClick={closeModal} className="flex-1" data-testid="cancel-create-rehearsal">
               Cancel
             </Button>
-            <Button type="submit" variant="primary" className="flex-1">
+            <Button type="submit" variant="primary" className="flex-1" data-testid="submit-create-rehearsal">
               Create
             </Button>
           </div>

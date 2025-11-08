@@ -1,4 +1,5 @@
 import type { StateCreator } from 'zustand'
+import { showToast } from '@/utils/toastManager'
 
 export type TimeFormat = '12h' | '24h'
 
@@ -50,13 +51,34 @@ const loadSettings = (): Settings => {
   return defaultSettings
 }
 
-// Save settings to localStorage
+// Debounce timer
+let saveTimer: ReturnType<typeof setTimeout> | null = null
+
+// Save settings to localStorage with debouncing
 const saveSettings = (settings: Settings) => {
-  try {
-    localStorage.setItem('soundcheck-settings', JSON.stringify(settings))
-  } catch (error) {
-    console.error('Error saving settings to localStorage:', error)
+  // Clear existing timer
+  if (saveTimer) {
+    clearTimeout(saveTimer)
   }
+
+  // Debounce saves to avoid excessive writes
+  saveTimer = setTimeout(() => {
+    try {
+      const serialized = JSON.stringify(settings)
+
+      // Check payload size (warn if > 100KB)
+      if (serialized.length > 100000) {
+        console.warn('Settings payload is large:', serialized.length, 'bytes')
+        showToast.warning('Settings data is unusually large')
+      }
+
+      localStorage.setItem('soundcheck-settings', serialized)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save settings'
+      console.error('Error saving settings to localStorage:', error)
+      showToast.error(errorMessage)
+    }
+  }, 500) // 500ms debounce
 }
 
 export const createSettingsSlice: StateCreator<

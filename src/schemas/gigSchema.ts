@@ -1,5 +1,23 @@
 import { z } from 'zod'
 
+const toISOWithOffset = (value: unknown) => {
+  if (typeof value !== 'string' || value.trim() === '') {
+    return value
+  }
+
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toISOString()
+}
+
+const isoDateTimeField = (message: string) =>
+  z.preprocess(
+    toISOWithOffset,
+    z.string().datetime({
+      offset: true,
+      message,
+    })
+  )
+
 /**
  * Zod schema for Venue validation
  */
@@ -24,16 +42,12 @@ export const compensationSchema = z.object({
  * Zod schema for Gig validation
  */
 export const gigSchema = z.object({
-  date: z
-    .string()
-    .regex(
-      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/,
-      'Date must be in ISO8601 format (YYYY-MM-DDTHH:mm)'
-    ),
-  callTime: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/, 'Call time must be in ISO8601 format')
-    .optional(),
+  date: isoDateTimeField(
+    'Date must be a valid ISO8601 string with timezone (e.g., 2024-05-01T19:00:00Z)'
+  ),
+  callTime: isoDateTimeField(
+    'Call time must be a valid ISO8601 string with timezone (e.g., 2024-05-01T18:00:00Z)'
+  ).optional(),
   venue: venueSchema,
   compensation: compensationSchema.optional(),
   status: z.enum(['pending', 'confirmed', 'completed', 'cancelled']).default('pending'),

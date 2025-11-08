@@ -1,6 +1,8 @@
-import { Info, Github, Bug, Lightbulb, RefreshCw } from 'lucide-react'
+import { useState } from 'react'
+import { Info, Github, Bug, Lightbulb, RefreshCw, Download } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/ToastProvider'
+import { useRegisterSW } from 'virtual:pwa-register/react'
 
 /**
  * About section
@@ -8,6 +10,19 @@ import { useToast } from '@/components/ui/ToastProvider'
  */
 export function AboutSection() {
   const toast = useToast()
+  const [checkingUpdate, setCheckingUpdate] = useState(false)
+
+  const {
+    needRefresh: [needRefresh],
+    updateServiceWorker,
+  } = useRegisterSW({
+    onRegistered(registration) {
+      console.log('SW Registered:', registration)
+    },
+    onRegisterError(error) {
+      console.error('SW registration error:', error)
+    },
+  })
 
   const handleReplayOnboarding = () => {
     localStorage.removeItem('hasSeenTour')
@@ -15,6 +30,28 @@ export function AboutSection() {
     setTimeout(() => {
       window.location.reload()
     }, 1000)
+  }
+
+  const handleCheckForUpdates = async () => {
+    setCheckingUpdate(true)
+    try {
+      const registration = await navigator.serviceWorker.getRegistration()
+      if (registration) {
+        await registration.update()
+        if (needRefresh) {
+          toast.info('Update available! Click "Update Now" in the notification.')
+        } else {
+          toast.success('You are running the latest version')
+        }
+      } else {
+        toast.info('Service Worker not registered')
+      }
+    } catch (error) {
+      console.error('Failed to check for updates:', error)
+      toast.error('Failed to check for updates')
+    } finally {
+      setCheckingUpdate(false)
+    }
   }
 
   const appVersion = '1.0.0' // Could be imported from package.json
@@ -90,6 +127,26 @@ export function AboutSection() {
           <span className="flex-1">Request a Feature</span>
           <span className="text-xs text-foreground/50">↗</span>
         </a>
+      </div>
+
+      {/* Check for Updates */}
+      <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1">
+            <h4 className="font-medium mb-1">Check for Updates</h4>
+            <p className="text-sm text-foreground/70">
+              Manually check for app updates
+            </p>
+          </div>
+          <Button
+            variant="secondary"
+            onClick={handleCheckForUpdates}
+            disabled={checkingUpdate}
+          >
+            <Download size={16} />
+            {checkingUpdate ? 'Checking...' : 'Check'}
+          </Button>
+        </div>
       </div>
 
       {/* Replay Onboarding */}

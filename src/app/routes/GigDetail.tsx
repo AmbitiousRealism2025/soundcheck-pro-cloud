@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useGigById, useGigs } from '@/store/hooks'
 import { CompensationTracker } from '@/components/gigs/CompensationTracker'
@@ -5,16 +6,55 @@ import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { TimelineItem } from '@/components/ui/TimelineItem'
 import { fmtDate } from '@/utils/dates'
-import { directionsLink } from '@/utils/maps'
-import { downloadIcs } from '@/utils/ics'
+import { directionsLink, openExternal } from '@/utils/maps'
+import { downloadIcs, type DownloadIcsResult } from '@/utils/ics'
+import { toSafeFilename } from '@/utils/sanitize'
 import { formatDistanceToNow } from 'date-fns'
-import type { Compensation } from '@/types'
+import type { Compensation, Gig } from '@/types'
+import { showToast } from '@/utils/toastManager'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+
+const DEFAULT_GIG_DURATION_MINUTES = 120
+
+type GigWithOptionalEnd = Gig & { end?: string }
+
+interface GigIcsTiming {
+  endISO?: string
+  durationMinutes?: number
+}
+
+const isValidEndAfterStart = (candidateISO: string | undefined, startMs: number) => {
+  if (!candidateISO) {
+    return false
+  }
+
+  const candidateMs = new Date(candidateISO).getTime()
+  return !Number.isNaN(candidateMs) && candidateMs > startMs
+}
+
+const getGigIcsTimingInternal = (gig: GigWithOptionalEnd): GigIcsTiming => {
+  const startMs = new Date(gig.date).getTime()
+  if (Number.isNaN(startMs)) {
+    return { durationMinutes: DEFAULT_GIG_DURATION_MINUTES }
+  }
+
+  if (isValidEndAfterStart(gig.callTime, startMs)) {
+    return { endISO: gig.callTime }
+  }
+
+  if (isValidEndAfterStart(gig.end, startMs)) {
+    return { endISO: gig.end }
+  }
+
+  return { durationMinutes: DEFAULT_GIG_DURATION_MINUTES }
+}
 
 export default function GigDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const gig = useGigById(id!)
   const { updateGig, deleteGig } = useGigs()
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   if (!gig) {
     return (
@@ -38,10 +78,14 @@ export default function GigDetail() {
   }
 
   const handleDelete = async () => {
-    if (window.confirm(`Delete gig at "${venueTitle}"? This cannot be undone.`)) {
-      await deleteGig(gig.id)
-      navigate('/gigs')
-    }
+    setConfirmOpen(true)
+  }
+
+  const handleConfirmDelete = async () => {
+    setConfirmOpen(false)
+    // Perform delete immediately; undo behavior could be wired here if desired
+    await deleteGig(gig.id)
+    navigate('/gigs')
   }
 
   const handleUpdateCompensation = async (compensation: Compensation) => {
@@ -52,161 +96,200 @@ export default function GigDetail() {
     })
   }
 
-  const handleExportIcs = () => {
-    downloadIcs({
+  const handleExportIcs = async () => {
+    const timing = getGigIcsTimingInternal(gig)
+    const result = await downloadIcs({
       title: `Gig: ${venueTitle}`,
       startISO: gig.date,
-      endISO: gig.callTime ?? gig.date,
+      ...timing,
       location: gig.venue.address,
       description: gig.notes,
-      filename: `gig-${venueTitle.replace(/\s+/g, '-').toLowerCase()}.ics`,
+      filename: toSafeFilename(`gig-${venueTitle}`, '.ics'),
     })
+
+    if (!result.ok) {
+      // Non-intrusive logging; consumers/tests may wire toast if desired
+      // Type narrowing: TypeScript knows result has 'error' property when ok is false
+      const errorResult = result as Extract<DownloadIcsResult, { ok: false }>
+      console.error('Failed to export ICS for gig:', errorResult.error)
+    }
+  }
+
+  const handleDirectionsClick = () => {
+    const trimmedAddress = gig.venue.address?.trim()
+    if (!trimmedAddress || trimmedAddress.length < 5) {
+      showToast.error('Venue address is missing or incomplete')
+      return
+    }
+
+    try {
+      const url = directionsLink(trimmedAddress)
+      const opened = openExternal(url)
+      if (!opened) {
+        throw new Error('Failed to trigger external navigation')
+      }
+    } catch (error) {
+      console.error('Failed to open directions:', error)
+      showToast.error('Unable to open directions for this gig')
+    }
   }
 
   return (
-    <div className="space-y-6">
-      {/* Hero Section */}
-      <div className="glass rounded-xl p-6 md:p-8">
-        <div className="flex items-start justify-between gap-4 mb-4">
-          <div className="flex-1">
-            <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-3xl md:text-4xl font-bold">{venueTitle}</h1>
-              <Badge variant={statusVariant[gig.status]} size="sm">
-                {gig.status}
-              </Badge>
-            </div>
-            <p className="text-xl opacity-80 mb-2">
-              {fmtDate(gig.date, 'EEEE, MMMM d, yyyy')} at{' '}
-              {fmtDate(gig.date, 'h:mm a')}
-            </p>
-            <p className="text-sm opacity-60">{countdown}</p>
-          </div>
-
-          <div className="flex gap-2">
-            <Button size="sm" variant="ghost" onClick={() => navigate('/gigs')}>
-              Back
-            </Button>
-            <Button size="sm" variant="danger" onClick={handleDelete}>
-              Delete
-            </Button>
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="flex gap-3 flex-wrap">
-          {gig.venue.address && (
-            <Button
-              variant="primary"
-              onClick={() => window.open(directionsLink(gig.venue.address!), '_blank')}
-            >
-              Get Directions
-            </Button>
-          )}
-          <Button variant="secondary" onClick={handleExportIcs}>
-            Export Calendar
-          </Button>
-          {gig.venue.contact && (
-            <Button variant="ghost">Contact: {gig.venue.contact}</Button>
-          )}
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Timeline & Details */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Timeline */}
-          {callTime && (
-            <div className="glass rounded-xl p-6">
-              <h2 className="text-xl font-semibold mb-4">Timeline</h2>
-              <div className="space-y-4">
-                <TimelineItem
-                  time={fmtDate(gig.callTime!, 'h:mm a')}
-                  title="Call Time"
-                  description="Arrive at venue"
-                  status={new Date() > callTime ? 'past' : new Date() > new Date(callTime.getTime() - 60 * 60 * 1000) ? 'current' : 'upcoming'}
-                />
-                <TimelineItem
-                  time={fmtDate(gig.date, 'h:mm a')}
-                  title="Downbeat"
-                  description="Performance starts"
-                  status={new Date() > gigDate ? 'past' : new Date() > new Date(gigDate.getTime() - 30 * 60 * 1000) ? 'current' : 'upcoming'}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Venue Details */}
-          <div className="glass rounded-xl p-6">
-            <h2 className="text-xl font-semibold mb-4">Venue Details</h2>
-            <div className="space-y-3">
-              <div>
-                <p className="text-sm opacity-60">Name</p>
-                <p className="text-lg font-medium">{gig.venue.name}</p>
-              </div>
-              {gig.venue.address && (
-                <div>
-                  <p className="text-sm opacity-60">Address</p>
-                  <p>{gig.venue.address}</p>
-                </div>
-              )}
-              {gig.venue.contact && (
-                <div>
-                  <p className="text-sm opacity-60">Contact</p>
-                  <p>{gig.venue.contact}</p>
-                </div>
-              )}
-              {gig.mileage && (
-                <div>
-                  <p className="text-sm opacity-60">Distance</p>
-                  <p>{gig.mileage.toFixed(1)} miles from home</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Notes */}
-          {gig.notes && (
-            <div className="glass rounded-xl p-6">
-              <h2 className="text-xl font-semibold mb-4">Notes</h2>
-              <p className="whitespace-pre-wrap opacity-80">{gig.notes}</p>
-            </div>
-          )}
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Compensation */}
-          <div className="glass rounded-xl p-6">
-            <h3 className="text-lg font-semibold mb-4">Compensation</h3>
-            <CompensationTracker
-              compensation={gig.compensation}
-              onUpdate={handleUpdateCompensation}
-            />
-          </div>
-
-          {/* Meta Info */}
-          <div className="glass rounded-xl p-6">
-            <h3 className="text-lg font-semibold mb-3">Details</h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="opacity-60">Created</span>
-                <span>{new Date(gig.createdAt).toLocaleDateString()}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="opacity-60">Last updated</span>
-                <span>{new Date(gig.updatedAt).toLocaleDateString()}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="opacity-60">Status</span>
+    <>
+      <div className="space-y-6">
+        {/* Hero Section */}
+        <div className="glass rounded-xl p-6 md:p-8">
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-2">
+                <h1 className="text-3xl md:text-4xl font-bold">{venueTitle}</h1>
                 <Badge variant={statusVariant[gig.status]} size="sm">
                   {gig.status}
                 </Badge>
               </div>
+              <p className="text-xl opacity-80 mb-2">
+                {fmtDate(gig.date, 'EEEE, MMMM d, yyyy')} at{' '}
+                {fmtDate(gig.date, 'h:mm a')}
+              </p>
+              <p className="text-sm opacity-60">{countdown}</p>
+            </div>
+
+            <div className="flex gap-2">
+              <Button size="sm" variant="ghost" onClick={() => navigate('/gigs')}>
+                Back
+              </Button>
+              <Button size="sm" variant="danger" onClick={handleDelete}>
+                Delete
+              </Button>
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="flex gap-3 flex-wrap">
+            {gig.venue.address && (
+              <Button
+                variant="primary"
+                onClick={handleDirectionsClick}
+              >
+                Get Directions
+              </Button>
+            )}
+            <Button variant="secondary" onClick={handleExportIcs}>
+              Export Calendar
+            </Button>
+            {gig.venue.contact && (
+              <Button variant="ghost">Contact: {gig.venue.contact}</Button>
+            )}
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Timeline & Details */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Timeline */}
+            {callTime && (
+              <div className="glass rounded-xl p-6">
+                <h2 className="text-xl font-semibold mb-4">Timeline</h2>
+                <div className="space-y-4">
+                  <TimelineItem
+                    time={fmtDate(gig.callTime!, 'h:mm a')}
+                    title="Call Time"
+                    description="Arrive at venue"
+                    status={new Date() > callTime ? 'past' : new Date() > new Date(callTime.getTime() - 60 * 60 * 1000) ? 'current' : 'upcoming'}
+                  />
+                  <TimelineItem
+                    time={fmtDate(gig.date, 'h:mm a')}
+                    title="Downbeat"
+                    description="Performance starts"
+                    status={new Date() > gigDate ? 'past' : new Date() > new Date(gigDate.getTime() - 30 * 60 * 1000) ? 'current' : 'upcoming'}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Venue Details */}
+            <div className="glass rounded-xl p-6">
+              <h2 className="text-xl font-semibold mb-4">Venue Details</h2>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm opacity-60">Name</p>
+                  <p className="text-lg font-medium">{gig.venue.name}</p>
+                </div>
+                {gig.venue.address && (
+                  <div>
+                    <p className="text-sm opacity-60">Address</p>
+                    <p>{gig.venue.address}</p>
+                  </div>
+                )}
+                {gig.venue.contact && (
+                  <div>
+                    <p className="text-sm opacity-60">Contact</p>
+                    <p>{gig.venue.contact}</p>
+                  </div>
+                )}
+                {gig.mileage && (
+                  <div>
+                    <p className="text-sm opacity-60">Distance</p>
+                    <p>{gig.mileage.toFixed(1)} miles from home</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Notes */}
+            {gig.notes && (
+              <div className="glass rounded-xl p-6">
+                <h2 className="text-xl font-semibold mb-4">Notes</h2>
+                <p className="whitespace-pre-wrap opacity-80">{gig.notes}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Compensation */}
+            <div className="glass rounded-xl p-6">
+              <h3 className="text-lg font-semibold mb-4">Compensation</h3>
+              <CompensationTracker
+                compensation={gig.compensation}
+                onUpdate={handleUpdateCompensation}
+              />
+            </div>
+
+            {/* Meta Info */}
+            <div className="glass rounded-xl p-6">
+              <h3 className="text-lg font-semibold mb-3">Details</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="opacity-60">Created</span>
+                  <span>{new Date(gig.createdAt).toLocaleDateString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="opacity-60">Last updated</span>
+                  <span>{new Date(gig.updatedAt).toLocaleDateString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="opacity-60">Status</span>
+                  <Badge variant={statusVariant[gig.status]} size="sm">
+                    {gig.status}
+                  </Badge>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Delete gig"
+        description={`Delete gig at "${venueTitle}"? This cannot be undone.`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setConfirmOpen(false)}
+      />
+    </>
   )
 }

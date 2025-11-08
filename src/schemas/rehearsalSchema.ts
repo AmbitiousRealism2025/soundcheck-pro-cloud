@@ -1,6 +1,24 @@
 import { z } from 'zod'
 import { taskSchema } from './taskSchema'
 
+const toISOWithOffset = (value: unknown) => {
+  if (typeof value !== 'string' || value.trim() === '') {
+    return value
+  }
+
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toISOString()
+}
+
+const isoDateTimeField = (message: string) =>
+  z.preprocess(
+    toISOWithOffset,
+    z.string().datetime({
+      offset: true,
+      message,
+    })
+  )
+
 /**
  * Zod schema for Rehearsal validation
  */
@@ -9,12 +27,9 @@ export const rehearsalSchema = z.object({
     .string()
     .min(1, 'Event name is required')
     .max(100, 'Event name must be less than 100 characters'),
-  date: z
-    .string()
-    .regex(
-      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/,
-      'Date must be in ISO8601 format (YYYY-MM-DDTHH:mm)'
-    ),
+  date: isoDateTimeField(
+    'Date must be a valid ISO8601 string with timezone (e.g., 2024-05-01T19:00:00Z)'
+  ),
   location: z.string().max(200, 'Location must be less than 200 characters').optional(),
   tasks: z.array(taskSchema).default([]),
   templateId: z.string().optional(),

@@ -1,6 +1,12 @@
 import { db } from './db'
 import { uid } from '@/utils/id'
-import type { Rehearsal, Gig, Task } from '@/types'
+import type { Rehearsal, Gig, RehearsalTemplate, MileageLog } from '@/types'
+import { showToast } from '@/utils/toastManager'
+import {
+  parseDatabaseBackupOrThrow,
+  type DatabaseBackup,
+  type DatabaseImportSummary,
+} from './backup'
 
 /**
  * Generate sample rehearsal data for development
@@ -380,8 +386,11 @@ export async function seedDatabase(): Promise<void> {
     console.log(`✅ Database seeded successfully!`)
     console.log(`   - ${rehearsals.length} rehearsals`)
     console.log(`   - ${gigs.length} gigs`)
+    showToast.success(`Database seeded with ${rehearsals.length} rehearsals and ${gigs.length} gigs`)
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to seed database'
     console.error('❌ Error seeding database:', error)
+    showToast.error(errorMessage)
     throw error
   }
 }
@@ -395,8 +404,11 @@ export async function clearDatabase(): Promise<void> {
     await db.rehearsals.clear()
     await db.gigs.clear()
     console.log('✅ Database cleared successfully!')
+    showToast.success('Database cleared successfully')
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to clear database'
     console.error('❌ Error clearing database:', error)
+    showToast.error(errorMessage)
     throw error
   }
 }
@@ -407,19 +419,25 @@ export async function clearDatabase(): Promise<void> {
 export async function exportDatabase(): Promise<string> {
   try {
     console.log('📤 Exporting database...')
-    const rehearsals = await db.rehearsals.toArray()
-    const gigs = await db.gigs.toArray()
+    const [rehearsals, gigs, rehearsalTemplates, mileageLogs] = await Promise.all([
+      db.rehearsals.toArray(),
+      db.gigs.toArray(),
+      db.rehearsalTemplates.toArray(),
+      db.mileageLogs.toArray(),
+    ])
 
-    const data = {
-      version: 1,
-      exportedAt: new Date().toISOString(),
+    const backup: DatabaseBackup = {
+      version: db.verno,
+      timestamp: Date.now(),
       data: {
         rehearsals,
         gigs,
+        rehearsalTemplates,
+        mileageLogs,
       },
     }
 
-    const json = JSON.stringify(data, null, 2)
+    const json = JSON.stringify(backup, null, 2)
     console.log('✅ Database exported successfully!')
     return json
   } catch (error) {
@@ -431,31 +449,62 @@ export async function exportDatabase(): Promise<string> {
 /**
  * Import data into the database from JSON
  */
-export async function importDatabase(jsonData: string): Promise<void> {
+export async function importDatabase(jsonData: string): Promise<DatabaseImportSummary> {
   try {
     console.log('📥 Importing database...')
-    const data = JSON.parse(jsonData)
-
-    if (!data.version || !data.data) {
-      throw new Error('Invalid export format')
+    const raw = JSON.parse(jsonData)
+    const backup = parseDatabaseBackupOrThrow(raw)
+    const { rehearsals, gigs, rehearsalTemplates, mileageLogs } = backup.data
+    const summary: DatabaseImportSummary = {
+      rehearsals: rehearsals.length,
+      gigs: gigs.length,
+      rehearsalTemplates: rehearsalTemplates.length,
+      mileageLogs: mileageLogs.length,
     }
 
-    // Clear existing data
-    await clearDatabase()
+    await db.transaction(
+      'rw',
+      [db.rehearsals, db.gigs, db.rehearsalTemplates, db.mileageLogs],
+      async () => {
+        await Promise.all([
+          db.rehearsals.clear(),
+          db.gigs.clear(),
+          db.rehearsalTemplates.clear(),
+          db.mileageLogs.clear(),
+        ])
 
-    // Import new data
-    if (data.data.rehearsals) {
-      await db.rehearsals.bulkAdd(data.data.rehearsals)
-    }
-    if (data.data.gigs) {
-      await db.gigs.bulkAdd(data.data.gigs)
-    }
+        if (summary.rehearsals) {
+          await db.rehearsals.bulkAdd(rehearsals as Rehearsal[])
+        }
+        if (summary.gigs) {
+          await db.gigs.bulkAdd(gigs as Gig[])
+        }
+        if (summary.rehearsalTemplates) {
+          await db.rehearsalTemplates.bulkAdd(rehearsalTemplates as RehearsalTemplate[])
+        }
+        if (summary.mileageLogs) {
+          await db.mileageLogs.bulkAdd(mileageLogs as MileageLog[])
+        }
+      }
+    )
 
     console.log('✅ Database imported successfully!')
-    console.log(`   - ${data.data.rehearsals?.length || 0} rehearsals`)
-    console.log(`   - ${data.data.gigs?.length || 0} gigs`)
+    console.log(`   - ${summary.rehearsals} rehearsals`)
+    console.log(`   - ${summary.gigs} gigs`)
+    if (summary.rehearsalTemplates) {
+      console.log(`   - ${summary.rehearsalTemplates} rehearsal templates`)
+    }
+    if (summary.mileageLogs) {
+      console.log(`   - ${summary.mileageLogs} mileage logs`)
+    }
+    showToast.success(
+      `Database imported: ${summary.rehearsals} rehearsals, ${summary.gigs} gigs`
+    )
+    return summary
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to import database'
     console.error('❌ Error importing database:', error)
+    showToast.error(errorMessage)
     throw error
   }
 }

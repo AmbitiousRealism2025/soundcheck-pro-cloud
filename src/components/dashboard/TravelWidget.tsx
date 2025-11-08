@@ -4,6 +4,7 @@ import { useSettings } from '@/store/hooks'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { fmtDate } from '@/utils/dates'
+import { compareISO, isUpcoming } from '@/utils/dateUtils'
 
 /**
  * Widget showing upcoming travel requirements
@@ -13,13 +14,10 @@ export function TravelWidget() {
   const { settings } = useSettings()
 
   // Get upcoming gigs with addresses
-  const now = new Date()
+  const now = Date.now()
   const upcomingGigsWithTravel = gigs
-    .filter((gig) => {
-      const gigDate = new Date(gig.date)
-      return gigDate >= now && gig.venue.address
-    })
-    .sort((a, b) => a.date.localeCompare(b.date))
+    .filter((gig) => isUpcoming(gig.date, now) && Boolean(gig.venue.address))
+    .sort((a, b) => compareISO(a.date, b.date))
     .slice(0, 5)
 
   const hasHomeAddress = Boolean(settings.homeAddress)

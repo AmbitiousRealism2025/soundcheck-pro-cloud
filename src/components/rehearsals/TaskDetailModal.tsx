@@ -4,8 +4,10 @@ import { Textarea } from '@/components/ui/Textarea'
 import { Button } from '@/components/ui/Button'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { useFormValidation } from '@/hooks/useFormValidation'
-import { updateTaskSchema } from '@/schemas/taskSchema'
+import { updateTaskSchema, type UpdateTaskFormData } from '@/schemas/taskSchema'
 import type { Task } from '@/types'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { useState } from 'react'
 
 interface TaskDetailModalProps {
   isOpen: boolean
@@ -25,6 +27,8 @@ export function TaskDetailModal({
   onSave,
   onDelete,
 }: TaskDetailModalProps) {
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+
   const {
     register,
     handleSubmit,
@@ -37,18 +41,29 @@ export function TaskDetailModal({
 
   const status = watch('status')
 
-  const onSubmit = (data: any) => {
+  const onSubmit = (data: UpdateTaskFormData) => {
     if (task) {
       onSave({ ...task, ...data })
       onClose()
     }
   }
 
-  const handleDelete = () => {
-    if (task && window.confirm('Delete this task?')) {
+  const handleRequestDelete = () => {
+    if (task) {
+      setDeleteDialogOpen(true)
+    }
+  }
+
+  const handleConfirmDelete = () => {
+    if (task) {
       onDelete(task.id)
+      setDeleteDialogOpen(false)
       onClose()
     }
+  }
+
+  const handleCancelDelete = () => {
+    setDeleteDialogOpen(false)
   }
 
   if (!task) return null
@@ -75,7 +90,12 @@ export function TaskDetailModal({
         />
 
         <div>
-          <label className="text-sm opacity-80 mb-2 block">Status</label>
+          <span
+            id="task-status-label"
+            className="text-sm opacity-80 mb-2 block"
+          >
+            Status
+          </span>
           <SegmentedControl
             options={[
               { value: 'open', label: 'Open' },
@@ -83,6 +103,7 @@ export function TaskDetailModal({
             ]}
             value={status || 'open'}
             onChange={(value) => setValue('status', value as 'open' | 'closed')}
+            aria-labelledby="task-status-label"
           />
         </div>
 
@@ -90,7 +111,7 @@ export function TaskDetailModal({
           <Button
             type="button"
             variant="danger"
-            onClick={handleDelete}
+            onClick={handleRequestDelete}
           >
             Delete
           </Button>
@@ -103,6 +124,20 @@ export function TaskDetailModal({
           </Button>
         </div>
       </form>
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title="Delete task?"
+        description={
+          <p>
+            This will permanently delete this task from the rehearsal.
+          </p>
+        }
+        confirmLabel="Delete task"
+        confirmVariant="danger"
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+      />
     </Modal>
   )
 }

@@ -6,6 +6,8 @@ import { fmtDate } from '@/utils/dates'
 import type { Gig } from '@/types'
 import { useGigs } from '@/store/hooks'
 import { useSettings } from '@/store/hooks'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { useState } from 'react'
 
 interface GigCardProps {
   gig: Gig
@@ -25,16 +27,24 @@ const gradientVariants = [
 export function GigCard({ gig }: GigCardProps) {
   const { deleteGig } = useGigs()
   const { settings } = useSettings()
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
   // Pick gradient based on gig ID for consistency
   const gradientIndex = parseInt(gig.id.slice(-1), 36) % gradientVariants.length
   const gradient = gradientVariants[gradientIndex]
 
-  const handleDelete = async (e: React.MouseEvent) => {
+  const handleDelete = (e: React.MouseEvent) => {
     e.preventDefault()
-    if (window.confirm(`Delete gig at "${gig.venue.name}"? This cannot be undone.`)) {
-      await deleteGig(gig.id)
-    }
+    setDeleteDialogOpen(true)
+  }
+
+  const handleConfirmDelete = async () => {
+    await deleteGig(gig.id)
+    setDeleteDialogOpen(false)
+  }
+
+  const handleCancelDelete = () => {
+    setDeleteDialogOpen(false)
   }
 
   const formatCurrency = (amount: number) => {
@@ -52,7 +62,7 @@ export function GigCard({ gig }: GigCardProps) {
   }
 
   return (
-    <Link to={`/gigs/${gig.id}`}>
+    <Link to={`/gigs/${gig.id}`} data-testid="gig-card">
       <Card
         className={`group hover:scale-[1.02] transition-transform bg-gradient-to-br ${gradient} relative overflow-hidden`}
       >
@@ -105,11 +115,34 @@ export function GigCard({ gig }: GigCardProps) {
             variant="danger"
             onClick={handleDelete}
             className="w-full"
+            data-testid="delete-gig-button"
           >
             Delete
           </Button>
         </div>
       </Card>
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title="Delete gig?"
+        description={
+          <>
+            <p>
+              This will permanently delete the gig at
+              {' '}
+              <strong>{gig.venue.name}</strong>
+              .
+            </p>
+            <p className="mt-1 text-warning">
+              This action cannot be undone.
+            </p>
+          </>
+        }
+        confirmLabel="Delete gig"
+        confirmVariant="danger"
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+      />
     </Link>
   )
 }

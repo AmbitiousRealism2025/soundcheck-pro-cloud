@@ -1,11 +1,13 @@
 import type { StateCreator } from 'zustand'
 import type { Rehearsal } from '@/types'
 import { db } from '@/db/db'
+import { compareISO, inRange, isUpcoming } from '@/utils/dateUtils'
+import { showToast } from '@/utils/toastManager'
 
 export interface RehearsalsState {
   rehearsals: Rehearsal[]
-  loading: boolean
-  error: string | null
+  rehearsalsLoading: boolean
+  rehearsalsError: string | null
 }
 
 export interface RehearsalsActions {
@@ -14,6 +16,7 @@ export interface RehearsalsActions {
   updateRehearsal: (rehearsal: Rehearsal) => Promise<void>
   deleteRehearsal: (id: string) => Promise<void>
   duplicateRehearsal: (id: string) => Promise<void>
+  resetRehearsals: () => void
   // Selectors
   selectRehearsalById: (id: string) => Rehearsal | undefined
   selectUpcomingRehearsals: () => Rehearsal[]
@@ -30,19 +33,21 @@ export const createRehearsalsSlice: StateCreator<
 > = (set, get) => ({
   // Initial state
   rehearsals: [],
-  loading: false,
-  error: null,
+  rehearsalsLoading: false,
+  rehearsalsError: null,
 
   // Actions
   loadRehearsals: async () => {
-    set({ loading: true, error: null })
+    set({ rehearsalsLoading: true, rehearsalsError: null })
     try {
       const rehearsals = await db.rehearsals.toArray()
-      set({ rehearsals, loading: false })
+      set({ rehearsals, rehearsalsLoading: false })
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to load rehearsals'
-      set({ error: errorMessage, loading: false })
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to load rehearsals'
+      set({ rehearsalsError: errorMessage, rehearsalsLoading: false })
       console.error('Error loading rehearsals:', error)
+      showToast.error(errorMessage)
     }
   },
 
@@ -51,17 +56,20 @@ export const createRehearsalsSlice: StateCreator<
     const previousRehearsals = get().rehearsals
     set({
       rehearsals: [...previousRehearsals, rehearsal],
-      error: null
+      rehearsalsError: null
     })
 
     try {
       await db.rehearsals.put(rehearsal)
+      showToast.success('Rehearsal added successfully')
     } catch (error) {
       // Rollback on error
       set({ rehearsals: previousRehearsals })
-      const errorMessage = error instanceof Error ? error.message : 'Failed to add rehearsal'
-      set({ error: errorMessage })
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to add rehearsal'
+      set({ rehearsalsError: errorMessage })
       console.error('Error adding rehearsal:', error)
+      showToast.error(errorMessage)
       throw error
     }
   },
@@ -70,18 +78,23 @@ export const createRehearsalsSlice: StateCreator<
     // Optimistic update
     const previousRehearsals = get().rehearsals
     set({
-      rehearsals: previousRehearsals.map(r => r.id === rehearsal.id ? rehearsal : r),
-      error: null
+      rehearsals: previousRehearsals.map((r) =>
+        r.id === rehearsal.id ? rehearsal : r
+      ),
+      rehearsalsError: null
     })
 
     try {
       await db.rehearsals.put(rehearsal)
+      showToast.success('Rehearsal updated successfully')
     } catch (error) {
       // Rollback on error
       set({ rehearsals: previousRehearsals })
-      const errorMessage = error instanceof Error ? error.message : 'Failed to update rehearsal'
-      set({ error: errorMessage })
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to update rehearsal'
+      set({ rehearsalsError: errorMessage })
       console.error('Error updating rehearsal:', error)
+      showToast.error(errorMessage)
       throw error
     }
   },
@@ -90,18 +103,21 @@ export const createRehearsalsSlice: StateCreator<
     // Optimistic update
     const previousRehearsals = get().rehearsals
     set({
-      rehearsals: previousRehearsals.filter(r => r.id !== id),
-      error: null
+      rehearsals: previousRehearsals.filter((r) => r.id !== id),
+      rehearsalsError: null
     })
 
     try {
       await db.rehearsals.delete(id)
+      showToast.success('Rehearsal deleted successfully')
     } catch (error) {
       // Rollback on error
       set({ rehearsals: previousRehearsals })
-      const errorMessage = error instanceof Error ? error.message : 'Failed to delete rehearsal'
-      set({ error: errorMessage })
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to delete rehearsal'
+      set({ rehearsalsError: errorMessage })
       console.error('Error deleting rehearsal:', error)
+      showToast.error(errorMessage)
       throw error
     }
   },
@@ -110,7 +126,8 @@ export const createRehearsalsSlice: StateCreator<
     const original = get().selectRehearsalById(id)
     if (!original) {
       const errorMessage = 'Rehearsal not found'
-      set({ error: errorMessage })
+      set({ rehearsalsError: errorMessage })
+      showToast.error(errorMessage)
       throw new Error(errorMessage)
     }
 
@@ -123,6 +140,15 @@ export const createRehearsalsSlice: StateCreator<
     }
 
     await get().addRehearsal(duplicate)
+    showToast.success('Rehearsal duplicated successfully')
+  },
+
+  resetRehearsals: () => {
+    set({
+      rehearsals: [],
+      rehearsalsLoading: false,
+      rehearsalsError: null,
+    })
   },
 
   // Selectors
@@ -131,15 +157,15 @@ export const createRehearsalsSlice: StateCreator<
   },
 
   selectUpcomingRehearsals: () => {
-    const now = new Date().toISOString()
+    const now = Date.now()
     return get().rehearsals
-      .filter(r => r.date >= now)
-      .sort((a, b) => a.date.localeCompare(b.date))
+      .filter((r) => isUpcoming(r.date, now))
+      .sort((a, b) => compareISO(a.date, b.date))
   },
 
   selectRehearsalsByDateRange: (start, end) => {
     return get().rehearsals
-      .filter(r => r.date >= start && r.date <= end)
-      .sort((a, b) => a.date.localeCompare(b.date))
+      .filter((r) => inRange(r.date, start, end))
+      .sort((a, b) => compareISO(a.date, b.date))
   },
 })

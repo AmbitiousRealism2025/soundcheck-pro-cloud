@@ -3,12 +3,14 @@ import { Component, type ReactNode } from 'react'
 interface Props {
   children: ReactNode
   fallback?: ReactNode
+  onReset?: () => void
 }
 
 interface State {
   hasError: boolean
   error: Error | null
   errorInfo: string | null
+  errorId: string | null
 }
 
 export class ErrorBoundary extends Component<Props, State> {
@@ -18,18 +20,46 @@ export class ErrorBoundary extends Component<Props, State> {
       hasError: false,
       error: null,
       errorInfo: null,
+      errorId: null,
     }
   }
 
   static getDerivedStateFromError(error: Error): Partial<State> {
+    const errorId = `ERR-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
     return {
       hasError: true,
       error,
+      errorId,
     }
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('ErrorBoundary caught an error:', error, errorInfo)
+    const errorLog = {
+      errorId: this.state.errorId,
+      timestamp: new Date().toISOString(),
+      error: {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+      },
+      componentStack: errorInfo.componentStack,
+      userAgent: navigator.userAgent,
+      url: window.location.href,
+    }
+
+    console.error('ErrorBoundary caught an error:', errorLog)
+
+    // Store error log in localStorage for user to export
+    try {
+      const existingLogs = JSON.parse(localStorage.getItem('soundcheck-error-logs') || '[]')
+      existingLogs.push(errorLog)
+      // Keep only last 10 errors
+      const recentLogs = existingLogs.slice(-10)
+      localStorage.setItem('soundcheck-error-logs', JSON.stringify(recentLogs))
+    } catch (e) {
+      console.error('Failed to save error log:', e)
+    }
+
     this.setState({
       error,
       errorInfo: errorInfo.componentStack || null,
@@ -37,11 +67,33 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   handleReset = () => {
-    this.setState({
-      hasError: false,
-      error: null,
-      errorInfo: null,
-    })
+    try {
+      if (this.props.onReset) {
+        this.props.onReset()
+      }
+    } finally {
+      this.setState({
+        hasError: false,
+        error: null,
+        errorInfo: null,
+        errorId: null,
+      })
+    }
+  }
+
+  handleExportLogs = () => {
+    try {
+      const logs = localStorage.getItem('soundcheck-error-logs') || '[]'
+      const blob = new Blob([logs], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `soundcheck-error-logs-${Date.now()}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Failed to export error logs:', error)
+    }
   }
 
   render() {
@@ -75,9 +127,23 @@ export class ErrorBoundary extends Component<Props, State> {
               Something went wrong
             </h1>
 
-            <p className="mb-6 text-center text-gray-600 dark:text-gray-400">
-              We're sorry, but something unexpected happened. You can try resetting the app or refreshing the page.
+            <p className="mb-2 text-center text-gray-600 dark:text-gray-400">
+              We&apos;re sorry, but something unexpected happened. You can try resetting the app or refreshing the page.
             </p>
+
+            {this.state.errorId && (
+              <div className="mb-4 rounded-lg bg-gray-100 p-3 dark:bg-gray-700">
+                <p className="text-center text-sm text-gray-700 dark:text-gray-300">
+                  <span className="font-semibold">Error Reference:</span>{' '}
+                  <code className="rounded bg-gray-200 px-2 py-1 font-mono text-xs dark:bg-gray-600">
+                    {this.state.errorId}
+                  </code>
+                </p>
+                <p className="mt-2 text-center text-xs text-gray-600 dark:text-gray-400">
+                  Please include this reference when reporting issues
+                </p>
+              </div>
+            )}
 
             {import.meta.env.DEV && this.state.error && (
               <div className="mb-6 rounded-lg bg-red-50 p-4 dark:bg-red-900/10">
@@ -97,18 +163,26 @@ export class ErrorBoundary extends Component<Props, State> {
               </div>
             )}
 
-            <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <button
+                  onClick={this.handleReset}
+                  className="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                >
+                  Try Again
+                </button>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                >
+                  Refresh Page
+                </button>
+              </div>
               <button
-                onClick={this.handleReset}
-                className="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                onClick={this.handleExportLogs}
+                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
               >
-                Try Again
-              </button>
-              <button
-                onClick={() => window.location.reload()}
-                className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-              >
-                Refresh Page
+                Export Error Logs
               </button>
             </div>
           </div>

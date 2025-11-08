@@ -3,6 +3,7 @@ import { useRegisterSW } from 'virtual:pwa-register/react'
 
 export function UpdateNotification() {
   const [showNotification, setShowNotification] = useState(false)
+  const [updating, setUpdating] = useState(false)
 
   const {
     needRefresh: [needRefresh, setNeedRefresh],
@@ -23,8 +24,23 @@ export function UpdateNotification() {
   }, [needRefresh])
 
   const handleUpdate = async () => {
+    setUpdating(true)
     setShowNotification(false)
-    await updateServiceWorker(true)
+
+    try {
+      // Call updateServiceWorker which will skipWaiting and reload
+      await updateServiceWorker(true)
+
+      // If updateServiceWorker doesn't reload automatically, do it manually
+      // Wait a moment for service worker to activate
+      setTimeout(() => {
+        window.location.reload()
+      }, 1000)
+    } catch (error) {
+      console.error('Failed to update service worker:', error)
+      setUpdating(false)
+      setShowNotification(true)
+    }
   }
 
   const handleDismiss = () => {
@@ -66,13 +82,15 @@ export function UpdateNotification() {
           <div className="mt-3 flex gap-3">
             <button
               onClick={handleUpdate}
-              className="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              disabled={updating}
+              className="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Update Now
+              {updating ? 'Updating...' : 'Update Now'}
             </button>
             <button
               onClick={handleDismiss}
-              className="rounded px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:text-gray-300 dark:hover:bg-gray-700"
+              disabled={updating}
+              className="rounded px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-300 dark:hover:bg-gray-700"
             >
               Later
             </button>

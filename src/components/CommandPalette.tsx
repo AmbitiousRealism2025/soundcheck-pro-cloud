@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Search, Command as CommandIcon } from 'lucide-react'
 import { useStore } from '@/store/useStore'
-import { useCommandPalette, type Command } from '@/hooks/useCommandPalette'
+import { useCommandPalette } from '@/hooks/useCommandPalette'
 import { Portal } from '@/components/ui/Portal'
 
 const GROUP_LABELS: Record<string, string> = {
@@ -19,6 +19,8 @@ export function CommandPalette() {
   const [selectedIndex, setSelectedIndex] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  const [liveMessage, setLiveMessage] = useState('')
+  const listboxId = 'command-palette-listbox'
 
   // Reset selection when commands change
   useEffect(() => {
@@ -83,6 +85,33 @@ export function CommandPalette() {
     selectedElement?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   }, [selectedIndex])
 
+  // Update live region with count and current selection for screen readers
+  useEffect(() => {
+    if (!isOpen) {
+      setLiveMessage('')
+      return
+    }
+
+    const count = filteredCommands.length
+
+    if (count === 0) {
+      setLiveMessage('No matching commands')
+      return
+    }
+
+    const selected = filteredCommands[selectedIndex]
+    if (!selected) {
+      setLiveMessage(`${count} commands available`)
+      return
+    }
+
+    setLiveMessage(
+      `${count} commands available. Selected: ${selected.label}${
+        selected.description ? ` - ${selected.description}` : ''
+      }`
+    )
+  }, [isOpen, filteredCommands, selectedIndex])
+
   if (!isOpen) return null
 
   return (
@@ -91,6 +120,8 @@ export function CommandPalette() {
       <div
         className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 animate-fadeIn"
         onClick={closeCommandPalette}
+        role="presentation"
+        aria-hidden="true"
       />
 
       {/* Command Palette */}
@@ -107,16 +138,34 @@ export function CommandPalette() {
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Type a command or search..."
                 className="flex-1 bg-transparent outline-none text-foreground placeholder:text-foreground/50"
+                role="combobox"
+                aria-expanded="true"
+                aria-controls={listboxId}
+                aria-activedescendant={
+                  filteredCommands[selectedIndex]
+                    ? `command-option-${filteredCommands[selectedIndex].id}`
+                    : undefined
+                }
               />
               <kbd className="hidden sm:inline-flex items-center gap-1 px-2 py-1 text-xs bg-white/5 rounded border border-white/10">
                 ESC
               </kbd>
             </div>
 
+            {/* Live region for screen readers */}
+            <div
+              aria-live="polite"
+              className="sr-only"
+            >
+              {liveMessage}
+            </div>
+
             {/* Commands List */}
             <div
               ref={listRef}
               className="max-h-96 overflow-y-auto overscroll-contain"
+              id={listboxId}
+              role="listbox"
             >
               {filteredCommands.length === 0 ? (
                 <div className="px-4 py-8 text-center text-foreground/50">
@@ -132,13 +181,18 @@ export function CommandPalette() {
                         <div className="px-4 py-2 text-xs font-semibold text-foreground/50 uppercase tracking-wider">
                           {GROUP_LABELS[group] || group}
                         </div>
-                        {commands.map((command, idx) => {
+                        {commands.map((command) => {
                           const globalIndex = filteredCommands.indexOf(command)
                           const isSelected = globalIndex === selectedIndex
+
+                          const optionId = `command-option-${command.id}`
 
                           return (
                             <button
                               key={command.id}
+                              id={optionId}
+                              role="option"
+                              aria-selected={isSelected}
                               data-index={globalIndex}
                               onClick={() => executeCommand(command)}
                               className={`

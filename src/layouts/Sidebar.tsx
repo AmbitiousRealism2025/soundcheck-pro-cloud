@@ -1,9 +1,98 @@
 import { NavLink } from 'react-router-dom'
 import { Home, Music, Calendar, BarChart3, Settings } from 'lucide-react'
 import { useStore } from '@/store/useStore'
+import { useEffect, useRef } from 'react'
+
+// Extend Window interface for custom sidebar refs
+declare global {
+  interface Window {
+    __soundcheckSidebarRefs?: {
+      toggleButtonRef: React.RefObject<HTMLButtonElement>
+    }
+  }
+}
 
 export function Sidebar() {
   const sidebarOpen = useStore(state => state.sidebarOpen)
+  const setSidebarOpen = useStore(state => state.setSidebarOpen)
+
+  const firstNavLinkRef = useRef<HTMLAnchorElement | null>(null)
+  const sidebarRef = useRef<HTMLDivElement | null>(null)
+
+  // Initialize window global for toggle button ref (assigned by Header)
+  useEffect(() => {
+    if (!window.__soundcheckSidebarRefs) {
+      window.__soundcheckSidebarRefs = {
+        toggleButtonRef: { current: null },
+      }
+    }
+    return () => {
+      if (window.__soundcheckSidebarRefs) {
+        delete window.__soundcheckSidebarRefs
+      }
+    }
+  }, [])
+
+  // When sidebar opens on mobile, move focus to first nav link and trap focus
+  useEffect(() => {
+    if (!sidebarOpen) {
+      // Return focus to toggle button when closing if available
+      const toggleButton = window.__soundcheckSidebarRefs?.toggleButtonRef?.current
+      if (toggleButton) {
+        toggleButton.focus()
+      }
+      return
+    }
+
+    const isMobile = window.innerWidth < 768
+    if (!isMobile) return
+
+    // Focus first nav link
+    if (firstNavLinkRef.current) {
+      firstNavLinkRef.current.focus()
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!sidebarRef.current) return
+      const focusableSelectors = [
+        'a[href]',
+        'button:not([disabled])',
+        '[tabindex]:not([tabindex="-1"])',
+      ]
+      const focusable = Array.from(
+        sidebarRef.current.querySelectorAll<HTMLElement>(focusableSelectors.join(','))
+      ).filter(el => !el.hasAttribute('disabled') && !el.getAttribute('aria-hidden'))
+
+      if (focusable.length === 0) return
+
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+
+      if (event.key === 'Tab') {
+        if (event.shiftKey) {
+          if (document.activeElement === first) {
+            event.preventDefault()
+            last.focus()
+          }
+        } else {
+          if (document.activeElement === last) {
+            event.preventDefault()
+            first.focus()
+          }
+        }
+      }
+
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setSidebarOpen(false)
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [sidebarOpen, setSidebarOpen])
 
   const navItems = [
     { to: '/', icon: Home, label: 'Home' },
@@ -15,6 +104,7 @@ export function Sidebar() {
 
   return (
     <aside
+      ref={sidebarRef}
       className={`
         fixed left-0 top-0 h-full
         bg-background/95 backdrop-blur-md
@@ -24,6 +114,7 @@ export function Sidebar() {
         overflow-hidden
         z-40
       `}
+      aria-hidden={!sidebarOpen && window.innerWidth < 768}
     >
       <div className="flex flex-col h-full">
         {/* Logo/Brand */}
@@ -39,10 +130,11 @@ export function Sidebar() {
 
         {/* Navigation */}
         <nav className="flex-1 p-4 space-y-2">
-          {navItems.map(({ to, icon: Icon, label }) => (
+          {navItems.map(({ to, icon: Icon, label }, index) => (
             <NavLink
               key={to}
               to={to}
+              ref={index === 0 ? firstNavLinkRef : undefined}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
                   isActive

@@ -2,6 +2,7 @@ import { useStore } from './useStore'
 import { shallow } from 'zustand/shallow'
 import type { Rehearsal, Gig } from '@/types'
 import type { Settings } from './slices/settingsSlice'
+import { compareISO } from '@/utils/dateUtils'
 
 /**
  * Hook to get rehearsals state and actions
@@ -11,8 +12,8 @@ export const useRehearsals = () => {
   return useStore(
     (state) => ({
       rehearsals: state.rehearsals,
-      loading: state.loading,
-      error: state.error,
+      rehearsalsLoading: state.rehearsalsLoading,
+      rehearsalsError: state.rehearsalsError,
       loadRehearsals: state.loadRehearsals,
       addRehearsal: state.addRehearsal,
       updateRehearsal: state.updateRehearsal,
@@ -34,8 +35,8 @@ export const useGigs = () => {
   return useStore(
     (state) => ({
       gigs: state.gigs,
-      loading: state.loading,
-      error: state.error,
+      gigsLoading: state.gigsLoading,
+      gigsError: state.gigsError,
       loadGigs: state.loadGigs,
       addGig: state.addGig,
       updateGig: state.updateGig,
@@ -107,7 +108,7 @@ export const useUpcomingEvents = (): Array<
     }))
 
     return [...upcomingRehearsals, ...upcomingGigs].sort((a, b) =>
-      a.date.localeCompare(b.date)
+      compareISO(a.date, b.date)
     )
   })
 }

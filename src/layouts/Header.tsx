@@ -1,7 +1,7 @@
 import { Menu, Plus, Bell } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { useNavigate } from 'react-router-dom'
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { NotificationBadge } from '@/components/NotificationBadge'
 import { NotificationsPanel } from '@/components/NotificationsPanel'
 import { useNotifications } from '@/hooks/useNotifications'
@@ -13,6 +13,16 @@ export function Header() {
   const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [notificationsPanelOpen, setNotificationsPanelOpen] = useState(false)
   const { unreadCount } = useNotifications()
+  const toggleButtonRef = useRef<HTMLButtonElement>(null)
+
+  // Wire ref to window global for Sidebar focus return
+  useEffect(() => {
+    if (!window.__soundcheckSidebarRefs) {
+      window.__soundcheckSidebarRefs = { toggleButtonRef }
+    } else {
+      window.__soundcheckSidebarRefs.toggleButtonRef = toggleButtonRef
+    }
+  }, [])
 
   return (
     <>
@@ -21,6 +31,7 @@ export function Header() {
           {/* Left: Menu toggle and breadcrumbs */}
           <div className="flex items-center gap-3">
             <button
+              ref={toggleButtonRef}
               onClick={toggleSidebar}
               className="p-2 hover:bg-white/5 rounded-lg transition-colors"
               aria-label="Toggle sidebar"

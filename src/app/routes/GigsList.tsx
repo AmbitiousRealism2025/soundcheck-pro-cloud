@@ -10,6 +10,7 @@ import { useFormValidation } from '@/hooks/useFormValidation'
 import { createGigSchema } from '@/schemas/gigSchema'
 import { uid } from '@/utils/id'
 import type { Gig } from '@/types'
+import { compareISO } from '@/utils/dateUtils'
 
 export default function GigsList() {
   const { gigs, loadGigs, addGig } = useGigs()
@@ -80,14 +81,14 @@ export default function GigsList() {
 
         return matchesSearch && matchesStatus
       })
-      .sort((a, b) => a.date.localeCompare(b.date))
+      .sort((a, b) => compareISO(a.date, b.date))
   }, [gigs, search, statusFilter])
 
   return (
     <div className="space-y-6">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Gigs</h1>
-        <Button variant="primary" onClick={() => openModal('create-gig')}>
+        <Button variant="primary" onClick={() => openModal('create-gig')} data-testid="new-gig-button">
           New Gig
         </Button>
       </header>
@@ -178,10 +179,10 @@ export default function GigsList() {
           />
 
           <div className="flex gap-3 pt-4">
-            <Button type="button" variant="ghost" onClick={closeModal} className="flex-1">
+            <Button type="button" variant="ghost" onClick={closeModal} className="flex-1" data-testid="cancel-create-gig">
               Cancel
             </Button>
-            <Button type="submit" variant="primary" className="flex-1">
+            <Button type="submit" variant="primary" className="flex-1" data-testid="submit-create-gig">
               Create
             </Button>
           </div>

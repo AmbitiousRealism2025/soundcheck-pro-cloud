@@ -1,6 +1,7 @@
-import { createContext, useContext, useState, ReactNode, useCallback } from 'react'
+import { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react'
 import { Portal } from './Portal'
 import { Toast } from './Toast'
+import { registerToast, unregisterToast } from '@/utils/toastManager'
 
 interface ToastItem {
   id: string
@@ -48,6 +49,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       info: (message, duration) => addToast('info', message, duration),
     },
   }
+
+  // Register toast manager on mount
+  useEffect(() => {
+    registerToast(addToast)
+    return () => {
+      unregisterToast()
+    }
+  }, [addToast])
 
   return (
     <ToastContext.Provider value={contextValue}>

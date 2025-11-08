@@ -21,25 +21,59 @@ export interface UIActions {
 
 export type UISlice = UIState & UIActions
 
-// Load theme from localStorage
-const getInitialTheme = (): Theme => {
-  const stored = localStorage.getItem('soundcheck-theme')
-  if (stored === 'light' || stored === 'dark' || stored === 'auto') {
-    return stored
+const THEME_STORAGE_KEY = 'soundcheck-theme'
+export const DARK_MODE_MEDIA_QUERY = '(prefers-color-scheme: dark)'
+
+const isValidTheme = (value: unknown): value is Theme =>
+  value === 'auto' || value === 'light' || value === 'dark'
+
+export const readStoredTheme = (): Theme | null => {
+  if (typeof localStorage === 'undefined') {
+    return null
   }
-  return 'auto'
+
+  try {
+    const stored = localStorage.getItem(THEME_STORAGE_KEY)
+    if (isValidTheme(stored)) {
+      return stored
+    }
+    return null
+  } catch {
+    return null
+  }
 }
 
-// Apply theme to document
-const applyTheme = (theme: Theme) => {
-  localStorage.setItem('soundcheck-theme', theme)
-
-  if (theme === 'auto') {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light')
-  } else {
-    document.documentElement.setAttribute('data-theme', theme)
+const persistTheme = (theme: Theme) => {
+  if (typeof localStorage === 'undefined') {
+    return
   }
+
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, theme)
+  } catch {
+    // no-op: storage may be unavailable
+  }
+}
+
+const prefersDarkMode = (): boolean => {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return false
+  }
+  return window.matchMedia(DARK_MODE_MEDIA_QUERY).matches
+}
+
+export const applyThemeToDocument = (theme: Theme, options?: { prefersDark?: boolean }) => {
+  if (typeof document === 'undefined') {
+    return
+  }
+
+  const prefersDark =
+    options?.prefersDark ?? (theme === 'auto' ? prefersDarkMode() : theme === 'dark')
+
+  const resolvedTheme =
+    theme === 'auto' ? (prefersDark ? 'dark' : 'light') : theme
+
+  document.documentElement.setAttribute('data-theme', resolvedTheme)
 }
 
 export const createUISlice: StateCreator<
@@ -47,53 +81,41 @@ export const createUISlice: StateCreator<
   [],
   [],
   UISlice
-> = (set, get) => {
-  // Initialize theme
-  const initialTheme = getInitialTheme()
-  applyTheme(initialTheme)
+> = (set, get) => ({
+  // Initial state
+  sidebarOpen: true,
+  commandPaletteOpen: false,
+  theme: 'auto',
+  activeModal: null,
 
-  // Listen for system theme changes when theme is 'auto'
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-    if (get().theme === 'auto') {
-      document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light')
-    }
-  })
+  // Actions
+  toggleSidebar: () => {
+    set({ sidebarOpen: !get().sidebarOpen })
+  },
 
-  return {
-    // Initial state
-    sidebarOpen: true,
-    commandPaletteOpen: false,
-    theme: initialTheme,
-    activeModal: null,
+  setSidebarOpen: (open) => {
+    set({ sidebarOpen: open })
+  },
 
-    // Actions
-    toggleSidebar: () => {
-      set({ sidebarOpen: !get().sidebarOpen })
-    },
+  openCommandPalette: () => {
+    set({ commandPaletteOpen: true })
+  },
 
-    setSidebarOpen: (open) => {
-      set({ sidebarOpen: open })
-    },
+  closeCommandPalette: () => {
+    set({ commandPaletteOpen: false })
+  },
 
-    openCommandPalette: () => {
-      set({ commandPaletteOpen: true })
-    },
+  setTheme: (theme) => {
+    set({ theme })
+    persistTheme(theme)
+    applyThemeToDocument(theme)
+  },
 
-    closeCommandPalette: () => {
-      set({ commandPaletteOpen: false })
-    },
+  openModal: (modalId) => {
+    set({ activeModal: modalId })
+  },
 
-    setTheme: (theme) => {
-      set({ theme })
-      applyTheme(theme)
-    },
-
-    openModal: (modalId) => {
-      set({ activeModal: modalId })
-    },
-
-    closeModal: () => {
-      set({ activeModal: null })
-    },
-  }
-}
+  closeModal: () => {
+    set({ activeModal: null })
+  },
+})

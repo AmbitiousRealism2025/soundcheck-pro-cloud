@@ -64,6 +64,14 @@ export function AppLayout() {
         <div
           className="md:hidden fixed inset-0 bg-black/50 z-30"
           onClick={() => setSidebarOpen(false)}
+          onKeyDown={event => {
+            if (event.key === 'Escape' || event.key === 'Enter') {
+              event.preventDefault()
+              setSidebarOpen(false)
+            }
+          }}
+          role="button"
+          tabIndex={0}
           aria-label="Close sidebar"
         />
       )}
