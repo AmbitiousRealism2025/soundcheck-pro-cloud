@@ -9,6 +9,7 @@ const RehearsalsList = lazy(() => import('./app/routes/RehearsalsList'))
 const RehearsalDetail = lazy(() => import('./app/routes/RehearsalDetail'))
 const GigsList = lazy(() => import('./app/routes/GigsList'))
 const GigDetail = lazy(() => import('./app/routes/GigDetail'))
+const Analytics = lazy(() => import('./app/routes/Analytics'))
 const Settings = lazy(() => import('./app/routes/Settings'))
 
 export default function AppRouter() {
@@ -52,6 +53,14 @@ export default function AppRouter() {
           element={
             <Suspense fallback={<RouteSuspenseFallback />}>
               <GigDetail />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/analytics"
+          element={
+            <Suspense fallback={<RouteSuspenseFallback />}>
+              <Analytics />
             </Suspense>
           }
         />
